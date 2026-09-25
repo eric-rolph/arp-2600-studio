@@ -17,6 +17,8 @@ The keyboard starts monophonic with last-note priority. **DUO** splits lower/upp
 
 Audio processing and recordings stay in the browser. No microphone audio is sent to Cloudflare or GitHub. The Worker serves static application files. Takes are in memory, up to eight takes of three minutes each, and are not persisted. Patches can be stored in localStorage or exported as JSON.
 
+**Patch a microphone anywhere.** Enable the microphone, then click **Patch mic** in External input and choose any highlighted input. You can also drag **MIC OUT** to an input or select **Microphone** in the routing form. One output can feed several inputs. Mic gain sets its level; the destination's level or modulation fader controls its effect. Use **ENV** for voice-loudness control of envelopes or gates. Disconnecting the microphone keeps its cables for the next session within the page. Existing saved patches retain their microphone connections.
+
 Patch memory contains 21 starting sounds, grouped by type. These include plucked and sine bass, pulse-width and portamento leads, electric piano, strings, kick, snare, hi-hat, random filter modulation, and voice patches. Each patch has a description below the selector. These are presets for this app, not copies of factory patch sheets.
 
 ## Synthesis architecture

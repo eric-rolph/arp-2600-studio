@@ -96,3 +96,37 @@ test('expanded patch memory loads parameters, routes and descriptions',async({pa
  await page.locator('#preset').selectOption('Lead · duophonic');await expect(page.locator('#duo')).toBeChecked();
  expect(await page.evaluate(()=>studio.engine.routes.v2pitch)).toBe('keyboardUpper');
 });
+
+test('microphone shortcut highlights every input and supports multiple destinations',async({page})=>{
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'Output: Microphone · MIC OUT',exact:true})).toBeVisible();
+ await expect(page.locator('#route-source option[value="preamp"]')).toHaveText('Microphone · MIC OUT');
+ for(const dest of ['filter1','v2pwm','v1pitch','adsrGate','shClock']){
+   await page.locator('#patch-mic').click();
+   await expect(page.locator('.jack.input.patch-target')).toHaveCount(await page.locator('.jack.input').count());
+   await jack(page,dest,'input').click();
+   expect(await page.evaluate(id=>studio.engine.routes[id],dest)).toBe('preamp');
+ }
+ await expect(page.locator('#cables .cable')).toHaveCount(5);
+ await expect(page.locator('#status')).toContainText('Enable Microphone');
+ expect(await page.evaluate(()=>studio.engine.micStream)).toBeNull();
+});
+
+test('a microphone cable sends actual audio through the VCA and survives disconnection',async({page})=>{
+ await page.goto('/');await page.locator('#power').click();
+ await page.evaluate(()=>{
+   const ctx=studio.engine.ctx,osc=ctx.createOscillator(),gain=ctx.createGain(),stream=ctx.createMediaStreamDestination();
+   osc.frequency.value=220;gain.gain.value=.2;osc.connect(gain).connect(stream);osc.start();
+   navigator.mediaDevices.getUserMedia=async()=>stream.stream;
+   window.testMicrophone={osc,gain,stream};
+   studio.engine.set('vcaInitial',1);studio.engine.set('vcaAdsr',0);studio.engine.set('reverb',0);
+ });
+ await page.locator('#mic-enable').click();await expect(page.locator('#mic-enable')).toHaveText('Disable mic');
+ await page.locator('#patch-mic').click();await jack(page,'vcaAudio','input').click();
+ await page.waitForTimeout(500);
+ expect(await page.evaluate(()=>{const a=new Float32Array(2048);studio.engine.analyser.getFloatTimeDomainData(a);return Math.sqrt(a.reduce((sum,x)=>sum+x*x,0)/a.length);})).toBeGreaterThan(.01);
+ await page.locator('#mic-enable').click();await expect(page.locator('#mic-patch-status')).toContainText('Microphone off');
+ expect(await page.evaluate(()=>studio.engine.routes.vcaAudio)).toBe('preamp');
+ await page.waitForTimeout(600);
+ expect(await page.evaluate(()=>{const a=new Float32Array(2048);studio.engine.analyser.getFloatTimeDomainData(a);return Math.max(...a.map(Math.abs));})).toBeLessThan(.001);
+});

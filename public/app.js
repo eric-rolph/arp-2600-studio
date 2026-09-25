@@ -20,7 +20,7 @@ const row=(...items)=>`<div class="faders">${items.join('')}</div>`;
 const module=(name,id,span,sub,content)=>`<section class="module span${span}" aria-label="${name}"><h2>${name}<b>${id}</b></h2><div class="sub">${sub}</div>${content}</section>`;
 function osc(n){const b='v'+n;return module('Oscillator '+n,'VCO '+n,4,n===2?'SINE / TRIANGLE / SAW / PULSE':'SAWTOOTH / PULSE',`<label class="module-toggle"><input type="checkbox" data-toggle="${b}lf"> LOW FREQUENCY RANGE</label>`+row(fader(b+'coarse','Frequency',-48,48,'st'),fader(b+'fine','Fine tune',-100,100,'ct'),fader(b+'fm','FM depth',0,3,'V'),fader(b+'pw','Pulse width',.03,.97))+ (n===2?`<label class="module-toggle">PWM <input type="range" data-param="v2pwm" aria-label="VCO 2 pulse-width modulation" min="0" max="1" step=".01" value="0"></label>`:'')+jacks(n===2?[[b+'saw','╱'],[b+'pulse','⊓'],[b+'sine','∿'],[b+'tri','△']]:[[b+'saw','╱'],[b+'pulse','⊓']],'output')+jacks(n===2?[[b+'pitch','KYBD'],[b+'fm','FM'],['v2pwm','PWM']]:[[b+'pitch','KYBD'],[b+'fm','FM']],'input'));}
 $('#modules').innerHTML=
- module('External input','PRE',3,'MIC PREAMP / FOLLOWER',row(fader('preamp','Gain',.1,30,'x',true),fader('efGain','EF gain',.1,10,'x',true))+`<div class="module-meter"><span id="ef-meter"></span></div><div class="faders small">${fader('efAttack','Attack',.001,.2,'s',true)}${fader('efRelease','Release',.01,2,'s',true)}</div>`+jacks([['preamp','OUT'],['ef','ENV']],'output')+jacks([['efInput','EF IN']],'input'))+
+ module('External input','PRE',3,'MIC PREAMP / FOLLOWER',row(fader('preamp','Mic gain',.1,30,'x',true),fader('efGain','EF gain',.1,10,'x',true))+`<div class="module-meter"><span id="ef-meter"></span></div><div class="faders small">${fader('efAttack','Attack',.001,.2,'s',true)}${fader('efRelease','Release',.01,2,'s',true)}</div>`+jacks([['preamp','MIC OUT'],['ef','ENV']],'output')+jacks([['efInput','EF IN']],'input')+`<div class="mic-patch-controls"><button id="mic-enable">Enable mic</button><button id="patch-mic">Patch mic</button></div><p id="mic-patch-status" class="mic-patch-note">Microphone off. Enable it to send a signal.</p>`)+
  [1,2,3].map(osc).join('')+
  module('Voltage controlled filter','VCF',6,'24 dB/OCT · RESONANT LOW PASS',row(fader('cutoff','Cutoff',20,18000,'Hz',true),fader('resonance','Resonance',0,.98),fader('filterEnv','Env depth',-4,6,'V'),fader('filterFM','Audio FM',0,3,'V'),fader('filterKey','Key track',0,1),fader('drive','Drive',0,1))+`<div class="faders small">${fader('v1level','VCO 1')}${fader('v2level','VCO 2')}${fader('v3level','VCO 3')}${fader('noiseLevel','Noise')}${fader('ringLevel','Ring')}${fader('micLevel','Preamp')}</div>`+jacks([['filter1','1'],['filter2','2'],['filter3','3'],['filterNoise','NOISE'],['filterRing','RING'],['filterMic','MIC']],'input')+jacks([['filterPitch','KYBD'],['filterEnv','ENV'],['filterFM','FM']],'input')+jacks([['vcf','VCF OUT']],'output'))+
  module('Amplifier','VCA',3,'ENVELOPE / INITIAL GAIN',row(fader('vcaInitial','Initial'),fader('vcaAdsr','ADSR'),fader('vcaAr','AR'))+`<div class="faders small">${fader('vcaRing','Ring mix')}</div>`+jacks([['vcaAudio','AUDIO'],['vcaRing','RING']],'input')+jacks([['vcaCV','ENV'],['vcaAR','AR']],'input')+jacks([['vca','OUT']],'output'))+
@@ -62,8 +62,9 @@ $('#export-patch').onclick=()=>download(new Blob([JSON.stringify({version:1,para
 $('#import-patch').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw new Error('Patch file is too large.');const p=validatedPatch(JSON.parse(await file.text()));engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Imported patch.';status('Patch imported.');e.target.value='';});fillPresets();
 
 for(const [id,name]of sources)$('#route-source').add(new Option(name,id));for(const [id,name]of destinations)$('#route-dest').add(new Option(name,id));
-function doPatch(dest,src){patchBay.cancel();engine.patch(dest,src);drawCables();renderRoutes();status(src?`Connected ${sourceNames[src]} to ${destNames[dest]}.`:`${destNames[dest]} restored to ${sourceNames[normal[dest]]}.`);}
+function doPatch(dest,src){patchBay.cancel();engine.patch(dest,src);drawCables();renderRoutes();const micHint=(src==='preamp'||src==='ef')&&!engine.micStream?' Enable Microphone to send a signal.':'';status(src?`Connected ${sourceNames[src]} to ${destNames[dest]}.${micHint}`:`${destNames[dest]} restored to ${sourceNames[normal[dest]]}.`);}
 const patchBay=new PatchBay({rack:$('#rack'),cables:$('#cables'),hint:$('#patch-hint'),routes:()=>engine.routes,onPatch:doPatch,status,sourceNames,destNames});
+$('#patch-mic').onclick=()=>{patchBay.begin($('[data-jack="preamp"][data-type="output"]'));if(!engine.micStream)status('Choose any green-ringed input. Enable Microphone to send a signal.');};
 $('#connect-route').onclick=()=>doPatch($('#route-dest').value,$('#route-source').value);
 $('#clear-patch').onclick=()=>{engine.routes={};engine.send('routes',{routes:{}});patchBay.cancel();drawCables();renderRoutes();status('All patch cables removed. Internal connections restored.');};
 $('#dock-keys').onclick=()=>{const on=$('.keyboard-panel').classList.toggle('docked');$('#dock-keys').setAttribute('aria-pressed',String(on));};
@@ -78,9 +79,21 @@ engine.addEventListener('ready',()=>{const update=()=>{const running=engine.ctx.
 engine.addEventListener('meter',e=>{lastMeter=e.detail;});engine.addEventListener('error',e=>status(e.detail,true));
 engine.addEventListener('control',syncControls);engine.addEventListener('notes',highlightKeys);
 async function devices(){if(!navigator.mediaDevices)return;const list=await navigator.mediaDevices.enumerateDevices(),select=$('#mic-device'),value=select.value;select.replaceChildren(new Option('Default input',''));for(const d of list.filter(d=>d.kind==='audioinput'&&d.deviceId!=='default'))select.add(new Option(d.label||'Microphone',d.deviceId));select.value=value;}
-$('#mic').onclick=safe(async()=>{if(micBusy)return;if(engine.micStream){engine.stopMicrophone();$('#mic').textContent='○ Microphone';$('#mic').classList.remove('active');status('Microphone disconnected.');return;}micBusy=true;$('#mic').disabled=true;try{await power();await engine.microphone($('#mic-device').value);$('#mic').textContent='● Microphone';$('#mic').classList.add('active');await devices();status('Microphone live. Use headphones. Choose a voice patch to hear processing.');}finally{micBusy=false;$('#mic').disabled=false;}});
-$('#mic-device').onchange=safe(async()=>{if(engine.micStream){await engine.microphone($('#mic-device').value);status('Microphone input changed.');}});
-engine.addEventListener('micended',()=>{$('#mic').textContent='○ Microphone';$('#mic').classList.remove('active');status('Microphone disconnected.');});
+function syncMicrophone(){
+ const live=!!engine.micStream;
+ $('#mic').textContent=live?'● Microphone':'○ Microphone';$('#mic').classList.toggle('active',live);$('#mic').disabled=micBusy;
+ $('#mic-enable').textContent=micBusy?'Connecting...':live?'Disable mic':'Enable mic';$('#mic-enable').classList.toggle('active',live);$('#mic-enable').disabled=micBusy;
+ $('#mic-patch-status').textContent=live?'Microphone live. MIC OUT can feed any input.':'Microphone off. Enable it to send a signal.';
+}
+$('#mic').onclick=$('#mic-enable').onclick=safe(async()=>{
+ if(micBusy)return;
+ if(engine.micStream){engine.stopMicrophone();syncMicrophone();status('Microphone disconnected. Its patch cables are kept.');return;}
+ micBusy=true;syncMicrophone();
+ try{await power();await engine.microphone($('#mic-device').value);await devices();status('Microphone live. Patch MIC OUT to any input. Use headphones.');}
+ finally{micBusy=false;syncMicrophone();}
+});
+$('#mic-device').onchange=safe(async()=>{if(engine.micStream){try{await engine.microphone($('#mic-device').value);status('Microphone input changed.');}finally{syncMicrophone();}}});
+engine.addEventListener('micended',()=>{syncMicrophone();status('Microphone disconnected. Its patch cables are kept.');});
 $('#midi').onclick=safe(async()=>{await power();const n=await engine.midi();$('#midi').classList.add('active');$('#midi').textContent='● MIDI';status(n?`${n} MIDI input${n>1?'s':''} connected.`:'MIDI enabled. Connect a keyboard to begin.');});
 engine.addEventListener('midistate',e=>{$('#midi-status').textContent=e.detail.length?e.detail.join(' · '):'MIDI ENABLED · NO DEVICE';if(!e.detail.length)engine.panic();});
 

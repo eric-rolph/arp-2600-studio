@@ -13,10 +13,11 @@ export const defaults = {
   glide:0,vibrato:0,vibratoRate:5.5,bend:0,mod:0,octave:0,duo:0,
 };
 export const sources = [
+ ['preamp','Microphone · MIC OUT'],['ef','Microphone envelope · ENV'],
  ['v1saw','VCO 1 · saw'],['v1pulse','VCO 1 · pulse'],
  ['v2saw','VCO 2 · saw'],['v2pulse','VCO 2 · pulse'],['v2sine','VCO 2 · sine'],['v2tri','VCO 2 · triangle'],
  ['v3saw','VCO 3 · saw'],['v3pulse','VCO 3 · pulse'],
- ['noise','Noise'],['preamp','Preamp'],['ef','Envelope follower'],['ring','Ring modulator'],
+ ['noise','Noise'],['ring','Ring modulator'],
  ['vcf','Filter'],['vca','Amplifier'],['adsr','ADSR'],['ar','AR'],['sh','Sample & hold'],
  ['clock','Clock'],['switch','Electronic switch'],['processor','Voltage processor'],['lag','Lag'],
  ['keyboard','Keyboard CV / lower'],['keyboardUpper','Keyboard upper CV'],['gate','Keyboard gate'],['lfo','Keyboard LFO']

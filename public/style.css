@@ -25,3 +25,5 @@ dialog{background:#22281f;color:var(--cream);border:1px solid #747b65;border-rad
 .patch-dragging{user-select:none;cursor:grabbing}
 .patch-dragging .jack{cursor:grabbing}
 @media(max-width:560px){.module[aria-label="Voltage controlled filter"],.module[aria-label="Envelope generators"]{grid-column:span 8}.module h2{font-size:13px}.fader>span,.fader output,.jack-label{font-size:11px}.keyboard{height:110px}.key span{font-size:11px}.key.black span{display:block;font-size:9px}.keyboard-controls{gap:7px}.key[hidden]{display:none}}
+
+.mic-patch-controls{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.mic-patch-controls button{flex:1;padding:6px;font-size:12px;white-space:nowrap}.mic-patch-note{font-size:12px;line-height:1.4;color:var(--muted);margin:8px 0 0}
