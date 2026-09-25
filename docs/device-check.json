@@ -38,5 +38,35 @@
       "kind": "audiooutput",
       "label": ""
     }
-  ]
+  ],
+  "physicalMicrophone": {
+    "input": "Default - Desktop Microphone (R\u00d8DE NT-USB Mini) (19f7:0015)",
+    "trackState": "live",
+    "trackMuted": false,
+    "contextState": "running",
+    "settings": {
+      "sampleRate": 48000,
+      "sampleSize": 16,
+      "channelCount": 2,
+      "echoCancellation": false,
+      "noiseSuppression": false,
+      "autoGainControl": false,
+      "latency": 0.01
+    },
+    "observedSeconds": 8,
+    "sampleObservations": 163840,
+    "rms": 0.00040872724136124236,
+    "peak": 0.0021938085556030273,
+    "nonfinite": 0,
+    "monitorConnected": false,
+    "audioSaved": false
+  },
+  "studioMicrophone": {
+    "app": "arp-2600-studio",
+    "microphoneWorkletPeak": 0.0016914589796215296,
+    "masterFader": "0",
+    "outputMeter": 0,
+    "recordings": 0,
+    "inputChoices": "Default inputCommunications - Desktop Microphone (R\u00d8DE NT-USB Mini) (19f7:0015)CABLE Output (VB-Audio Virtual Cable)Desktop Microphone (R\u00d8DE NT-USB Mini) (19f7:0015)"
+  }
 }
