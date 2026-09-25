@@ -1,0 +1,28 @@
+name: Verify and deploy from Windows
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-worker
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.repository == 'eric-rolph/arp-2600-studio'
+    runs-on: [self-hosted, Windows, X64, arp-2600-studio]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install exact dependencies
+        run: npm.cmd ci --no-fund --no-audit
+      - name: Verify DSP and JavaScript
+        run: npm.cmd run check
+      - name: Deploy using this Windows user's encrypted credential store
+        run: ./scripts/deploy-local.ps1

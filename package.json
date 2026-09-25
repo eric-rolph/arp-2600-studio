@@ -1,0 +1,13 @@
+{
+  "name": "arp-2600-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "check": "node --check public/app.js && node --check public/engine.js && node --check public/dsp.js && node --check public/tape.js && node --test tests/dsp.test.js",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": { "wrangler": "4.139.0", "@playwright/test": "1.63.0" }
+}

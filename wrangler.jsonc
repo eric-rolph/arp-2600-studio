@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "arp-2600-studio",
+  "compatibility_date": "2026-09-24",
+  "assets": { "directory": "./public" },
+  "workers_dev": true
+}
