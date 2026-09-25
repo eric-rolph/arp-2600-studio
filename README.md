@@ -19,7 +19,11 @@ Audio processing and recordings stay in the browser. No microphone audio is sent
 
 **Patch a microphone anywhere.** Enable the microphone, then click **Patch mic** in External input and choose any highlighted input. You can also drag **MIC OUT** to an input or select **Microphone** in the routing form. One output can feed several inputs. Mic gain sets its level; the destination's level or modulation fader controls its effect. Use **ENV** for voice-loudness control of envelopes or gates. Disconnecting the microphone keeps its cables for the next session within the page. Existing saved patches retain their microphone connections.
 
-Patch memory contains 21 starting sounds, grouped by type. These include plucked and sine bass, pulse-width and portamento leads, electric piano, strings, kick, snare, hi-hat, random filter modulation, and voice patches. Each patch has a description below the selector. These are presets for this app, not copies of factory patch sheets.
+Patch memory contains 64 starting sounds, grouped by type. These include plucked and sine bass, pulse-width and portamento leads, electric piano, strings, kick, snare, hi-hat, random filter modulation, and voice patches. Each patch has a description below the selector. These are presets for this app, not copies of factory patch sheets.
+
+## Patch library
+
+64 entries: the existing 21 patches and 43 new patches for bass, leads, keys, percussion, pads, textures, microphone processing and modulation. Open **Browse library** to search, filter, preview, favorite, annotate and organize memories. Bank import/export transfers whole collections; 2600 banks also open in TONTO. See the [library guide and full catalog](docs/patch-library.md).
 
 ## Synthesis architecture
 

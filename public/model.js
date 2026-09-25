@@ -1,3 +1,4 @@
+import {arpExpansion} from './preset-bank.js';
 // Signals use normalized audio ±1 and control voltages in volts (1 V/octave).
 export const defaults = {
   v1coarse:0,v1fine:0,v1level:.65,v1fm:0,v1lf:0,v1pw:.5,
@@ -114,3 +115,10 @@ export const presetNotes = {
  'Modulation · random filter':'Sample-and-hold changes the cutoff eight times per second. Hold a note.',
  'Modulation · siren':'A slow LFO sweeps the sine oscillator pitch. Hold a note.',
 };
+
+for(const p of arpExpansion){presets[p.name]={params:p.params,routes:p.routes};presetNotes[p.name]=p.description+' '+p.play;}
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-$/,'');
+export const arpLibrary=Object.entries(presets).map(([name,patch])=>{
+ const added=arpExpansion.find(p=>p.name===name),first=name.split(' · ')[0],category=first==='Warm'?'Pad':first==='Metal'?'Percussion':first==='Init'?'Study':first==='Droid'?'Experimental':first;
+ return {id:'arp-'+slug(name),name,category,family:'ARP 2600',mode:name.toLowerCase().includes('voice')?'Microphone':'Keys',description:presetNotes[name],play:'Play C3–C5. Adjust cutoff, envelope and oscillator balance.',tags:[category.toLowerCase()],note:60,...added,patch:{version:1,params:{...defaults,...patch.params},routes:{...patch.routes}}};
+});

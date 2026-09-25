@@ -81,7 +81,9 @@ test('cancelling or dropping on an output preserves existing routing and held no
 
 test('touch dragging patches without scrolling the page',async({browser,baseURL})=>{
  const context=await browser.newContext({hasTouch:true,isMobile:true,viewport:{width:390,height:900}});const page=await context.newPage();await page.goto(baseURL);
- const output=jack(page,'v1saw','output'),input=jack(page,'v1fm','input');await input.scrollIntoViewIfNeeded();
+ const output=jack(page,'v1saw','output'),input=jack(page,'v1fm','input');
+ // Keep the gesture clear of the intentional 55px edge-scroll zones.
+ await input.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
  const a=await midpoint(output),b=await midpoint(input),scroll=await page.evaluate(()=>scrollY),cdp=await context.newCDPSession(page);
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});
  for(let i=1;i<=8;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/8,y:a.y+(b.y-a.y)*i/8}]});
@@ -90,7 +92,7 @@ test('touch dragging patches without scrolling the page',async({browser,baseURL}
 });
 
 test('expanded patch memory loads parameters, routes and descriptions',async({page})=>{
- await page.goto('/');await expect(page.locator('#preset option')).toHaveCount(21);await expect(page.locator('.empty-tape')).toContainText('No recordings yet.');
+ await page.goto('/');await expect(page.locator('#preset option')).toHaveCount(64);await expect(page.locator('.empty-tape')).toContainText('No recordings yet.');
  await page.locator('#preset').selectOption('Lead · pulse width');await expect(page.locator('#preset-note')).toContainText('pulse width');
  expect(await page.evaluate(()=>({route:studio.engine.routes.v2pwm,depth:studio.engine.params.v2pwm}))).toEqual({route:'lfo',depth:.65});
  await page.locator('#preset').selectOption('Lead · duophonic');await expect(page.locator('#duo')).toBeChecked();

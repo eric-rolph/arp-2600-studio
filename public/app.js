@@ -1,13 +1,15 @@
+import {setupLibrary} from './library-ui.js';
+import {cleanName,uniqueName} from './library-bank.js';
 import {setupInterface} from './interface.js';
 import {setupSessions} from './session.js';
 import {Engine} from './engine.js';
 import {Tape,download} from './tape.js';
 import {PatchBay} from './patchbay.js';
-import {defaults,sources,destinations,normal,presets,presetNotes} from './model.js';
+import {defaults,sources,destinations,normal,presets,presetNotes,arpLibrary} from './model.js';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const engine=new Engine(),tape=new Tape(engine),controls=new Map();
-let powerBusy=false,micBusy=false,lastMeter={peak:0,mic:0,ef:0},userPresets={};
+let powerBusy=false,micBusy=false,lastMeter={peak:0,mic:0,ef:0},userPresets=Object.create(null);
 const sourceNames=Object.fromEntries(sources),destNames=Object.fromEntries(destinations.map(([id,name])=>[id,name]));
 function status(message,error=false){$('#status').textContent=message;$('#status').style.color=error?'#ffae90':'';}
 function safe(fn){return async(...args)=>{try{await fn(...args);}catch(e){status(e.message||String(e),true);}};}
@@ -45,21 +47,25 @@ for(const el of $$('[data-param]')){
 for(const el of $$('[data-toggle]'))el.onchange=()=>engine.set(el.dataset.toggle,el.checked?1:0);
 $('#glide').oninput=e=>engine.set('glide',+e.target.value);$('#vibrato').oninput=e=>engine.set('vibrato',+e.target.value);
 
-try{userPresets=JSON.parse(localStorage.getItem('2600-patches')||'{}');}catch{}
+try{for(const [name,p]of Object.entries(JSON.parse(localStorage.getItem('2600-patches')||'{}')))try{userPresets[cleanName(name)]={...validatedPatch(p),...(p.library?{library:p.library}:{})};}catch{}}catch{}
 function fillPresets(){
   const select=$('#preset');select.replaceChildren();
   const groups=new Map();
-  for(const name of [...Object.keys(presets),...Object.keys(userPresets)]){
+  for(const name of Object.keys(presets)){
     const category=name.startsWith('Warm ·')?'Pad':name.startsWith('Metal ·')?'Percussion':name.split(' · ')[0];
     if(!groups.has(category)){const group=document.createElement('optgroup');group.label=category;groups.set(category,group);select.append(group);}
     const option=new Option(name,name);option.title=presetNotes[name]||'Saved in this browser.';groups.get(category).append(option);
   }
+  if(Object.keys(userPresets).length){const group=document.createElement('optgroup');group.label='Saved in this browser';for(const name of Object.keys(userPresets))group.append(new Option(name,'user:'+name));select.append(group);}
 }
-function describePreset(){const name=$('#preset').value;$('#preset-note').textContent=presetNotes[name]||'Saved in this browser.';}
+function describePreset(){const name=$('#preset').value;$('#preset-note').textContent=presetNotes[name]||userPresets[name.slice(5)]?.library?.description||'Saved in this browser.';}
 
-function validatedPatch(patch){if(!patch||typeof patch!=='object'||!patch.params||!patch.routes)throw new Error('Choose a 2600 Studio patch JSON file.');const params={...defaults},routes={};for(const [key,value]of Object.entries(patch.params)){if(!Object.hasOwn(defaults,key)||!Number.isFinite(value))continue;const cfg=controls.get(key);params[key]=cfg?Math.max(cfg.min,Math.min(cfg.max,value)):key==='octave'?Math.max(-3,Math.min(3,Math.round(value))):key==='bend'?Math.max(-2,Math.min(2,value)):Math.max(0,Math.min(1,value));}for(const [dest,src]of Object.entries(patch.routes))if(Object.hasOwn(normal,dest)&&Object.hasOwn(sourceNames,src))routes[dest]=src;return{params,routes};}
-$('#preset').onchange=()=>{const patch=presets[$('#preset').value]||userPresets[$('#preset').value];if(!patch)return;const p=validatedPatch(patch);engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();describePreset();status('Loaded '+$('#preset').value+'.');};
-$('#save-patch').onclick=()=>{const name=prompt('Name this patch:','My patch');if(!name?.trim())return;userPresets['User · '+name.trim()]={params:{...engine.params},routes:{...engine.routes}};try{localStorage.setItem('2600-patches',JSON.stringify(userPresets));fillPresets();$('#preset').value='User · '+name.trim();describePreset();status('Patch saved in this browser.');}catch{status('Browser storage is unavailable. Use Export to save this patch.',true);}};
+function validatedPatch(patch){if(!patch||typeof patch!=='object'||!patch.params||!patch.routes)throw new Error('Choose a 2600 Studio patch JSON file.');const params={...defaults},routes={};for(const [key,value]of Object.entries(patch.params)){if(!Object.hasOwn(defaults,key)||!Number.isFinite(value))continue;const cfg=controls.get(key);params[key]=cfg?Math.max(cfg.min,Math.min(cfg.max,value)):key==='vibratoRate'?Math.max(.1,Math.min(20,value)):key==='octave'?Math.max(-3,Math.min(3,Math.round(value))):key==='bend'?Math.max(-2,Math.min(2,value)):Math.max(0,Math.min(1,value));}for(const [dest,src]of Object.entries(patch.routes))if(Object.hasOwn(normal,dest)&&Object.hasOwn(sourceNames,src))routes[dest]=src;return{version:1,params,routes};}
+$('#preset').onchange=()=>{const value=$('#preset').value,patch=value.startsWith('user:')?userPresets[value.slice(5)]:presets[value]||userPresets[value];if(!patch)return;const p=validatedPatch(patch);engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();describePreset();status('Loaded '+$('#preset').selectedOptions[0].textContent+'.');};
+function writeMemories(next){const current=$('#preset').value;localStorage.setItem('2600-patches',JSON.stringify(next));userPresets=next;fillPresets();$('#preset').value=current;}
+$('#save-patch').onclick=safe(()=>{const requested=prompt('Name this patch:','My patch');if(!requested?.trim())return;const name=uniqueName('User · '+cleanName(requested),userPresets),next=Object.assign(Object.create(null),userPresets,{[name]:validatedPatch({params:engine.params,routes:engine.routes})});writeMemories(next);$('#preset').value='user:'+name;describePreset();status('Patch saved in this browser.');});
+window.addEventListener('storage',e=>{if(e.key!=='2600-patches')return;try{const next=Object.create(null),current=$('#preset').value;for(const [name,p]of Object.entries(JSON.parse(e.newValue||'{}')))try{next[cleanName(name)]={...validatedPatch(p),...(p.library?{library:p.library}:{})};}catch{}userPresets=next;fillPresets();$('#preset').value=current;}catch{}});
+setupLibrary({studio:'arp-2600-studio',entries:arpLibrary,getSaved:()=>userPresets,writeSaved:writeMemories,capture:()=>validatedPatch({params:engine.params,routes:engine.routes}),validate:validatedPatch,routeName:id=>sourceNames[id]||destNames[id]||id,load:entry=>{const p=validatedPatch(entry.patch);engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset').value=entry.user?'user:'+entry.name:entry.name;$('#preset-note').textContent=entry.description+' '+entry.play;status('Loaded '+entry.name+'.');}});
 $('#export-patch').onclick=()=>download(new Blob([JSON.stringify({version:1,params:engine.params,routes:engine.routes},null,2)],{type:'application/json'}),'2600-patch.json');
 $('#import-patch').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw new Error('Patch file is too large.');const p=validatedPatch(JSON.parse(await file.text()));engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Imported patch.';status('Patch imported.');e.target.value='';});fillPresets();
 
@@ -115,7 +121,7 @@ let manualHeld=false;engine.addEventListener('panic',()=>{pendingKeys.clear();po
 $('#manual-gate').onpointerdown=safe(async e=>{manualHeld=true;e.target.setPointerCapture(e.pointerId);await engine.start();if(manualHeld)engine.on(60,1,'manual');highlightKeys();});
 for(const ev of ['pointerup','pointercancel','lostpointercapture'])$('#manual-gate').addEventListener(ev,()=>{manualHeld=false;engine.off('manual');highlightKeys();});
 $('#oct-down').onclick=()=>octave(-1);$('#oct-up').onclick=()=>octave(1);
-window.addEventListener('keydown',safe(async e=>{if(e.target.matches('input,select,textarea')||$('#guide').open||e.ctrlKey||e.metaKey||e.altKey)return;const key=e.key.toLowerCase();if(e.repeat)return;if(key==='escape'){patchBay.cancel();engine.panic();highlightKeys();return;}if(key==='z')return octave(-1);if(key==='x')return octave(1);if(key in keymap){e.preventDefault();pendingKeys.add(key);await engine.start();if(pendingKeys.has(key))engine.on(60+keymap[key],1,'key-'+key);highlightKeys();}}));
+window.addEventListener('keydown',safe(async e=>{if(e.target.matches('input,select,textarea')||document.querySelector('dialog[open]')||e.ctrlKey||e.metaKey||e.altKey)return;const key=e.key.toLowerCase();if(e.repeat)return;if(key==='escape'){patchBay.cancel();engine.panic();highlightKeys();return;}if(key==='z')return octave(-1);if(key==='x')return octave(1);if(key in keymap){e.preventDefault();pendingKeys.add(key);await engine.start();if(pendingKeys.has(key))engine.on(60+keymap[key],1,'key-'+key);highlightKeys();}}));
 window.addEventListener('keyup',e=>{const key=e.key.toLowerCase();pendingKeys.delete(key);if(key in keymap){engine.off('key-'+key);highlightKeys();}});
 window.addEventListener('blur',()=>{pendingKeys.clear();pointers.clear();engine.dropNotes(id=>String(id).startsWith('key-')||String(id).startsWith('pointer-')||id==='manual');manualHeld=false;highlightKeys();});
 window.addEventListener('beforeunload',e=>{if(tape.takes.length||tape.recording){e.preventDefault();e.returnValue='';}});
