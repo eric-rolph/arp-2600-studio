@@ -1,3 +1,4 @@
+import {setupSessions} from './session.js';
 import {Engine} from './engine.js';
 import {Tape,download} from './tape.js';
 import {PatchBay} from './patchbay.js';
@@ -73,7 +74,7 @@ function renderRoutes(){const container=$('#route-list');container.replaceChildr
 function drawCables(){patchBay.draw();}
 
 async function power(){if(powerBusy)return;powerBusy=true;try{await engine.start();$('#power').textContent='⏻ Audio on';$('#power').classList.add('active');$('#audio-state').textContent='ENGINE RUNNING';$('#sample-rate').textContent=`${engine.ctx.sampleRate/1000} kHz / 2× OSC`;status('Audio ready. Play the keyboard or connect a microphone.');}finally{powerBusy=false;}}
-$('#power').onclick=safe(async()=>{if(engine.ctx?.state==='running'){engine.panic();tape.stop();tape.stopRecord();await engine.ctx.suspend();$('#power').textContent='⏻ Power on';$('#audio-state').textContent='AUDIO SUSPENDED';status('Audio suspended.');return;}await power();});
+$('#power').onclick=safe(async()=>{if(engine.ctx?.state==='running'){engine.panic();tape.stop();await tape.stopRecord();await engine.ctx.suspend();$('#power').textContent='⏻ Power on';$('#audio-state').textContent='AUDIO SUSPENDED';status('Audio suspended.');return;}await power();});
 $('#panic').onclick=()=>{engine.panic();tape.stop();highlightKeys();status('Notes, feedback and reverb cleared.');};
 engine.addEventListener('ready',()=>{const update=()=>{const running=engine.ctx.state==='running';$('#power').textContent=running?'⏻ Audio on':'⏻ Power on';$('#power').classList.toggle('active',running);$('#audio-state').textContent=running?'ENGINE RUNNING':'AUDIO SUSPENDED';$('#sample-rate').textContent=`${engine.ctx.sampleRate/1000} kHz / 2× OSC`;};engine.ctx.onstatechange=update;update();});
 engine.addEventListener('meter',e=>{lastMeter=e.detail;});engine.addEventListener('error',e=>status(e.detail,true));
@@ -95,7 +96,7 @@ $('#mic').onclick=$('#mic-enable').onclick=safe(async()=>{
 $('#mic-device').onchange=safe(async()=>{if(engine.micStream){try{await engine.microphone($('#mic-device').value);status('Microphone input changed.');}finally{syncMicrophone();}}});
 engine.addEventListener('micended',()=>{syncMicrophone();status('Microphone disconnected. Its patch cables are kept.');});
 $('#midi').onclick=safe(async()=>{await power();const n=await engine.midi();$('#midi').classList.add('active');$('#midi').textContent='● MIDI';status(n?`${n} MIDI input${n>1?'s':''} connected.`:'MIDI enabled. Connect a keyboard to begin.');});
-engine.addEventListener('midistate',e=>{$('#midi-status').textContent=e.detail.length?e.detail.join(' · '):'MIDI ENABLED · NO DEVICE';if(!e.detail.length)engine.panic();});
+engine.addEventListener('midistate',e=>{$('#midi-status').textContent=e.detail.length?e.detail.join(' · '):'MIDI ENABLED · NO DEVICE';});
 
 const keymap={'a':0,'w':1,'s':2,'e':3,'d':4,'f':5,'t':6,'g':7,'y':8,'h':9,'u':10,'j':11,'k':12,'o':13,'l':14,'p':15,';':16,"'":17};
 const blackNotes=new Set([1,3,6,8,10]);let whiteIndex=0;const whiteCount=29;
@@ -109,13 +110,13 @@ $('#keyboard').addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))
 for(const event of ['pointerup','pointercancel','lostpointercapture'])$('#keyboard').addEventListener(event,e=>{if(pointers.has(e.pointerId)){engine.off('pointer-'+e.pointerId);pointers.delete(e.pointerId);highlightKeys();}});
 function octave(delta){engine.set('octave',Math.max(-3,Math.min(3,engine.params.octave+delta)));syncControls();}
 $('#duo').onchange=e=>{engine.set('duo',e.target.checked?1:0);if(e.target.checked)doPatch('v2pitch','keyboardUpper');else if(engine.routes.v2pitch==='keyboardUpper')doPatch('v2pitch',null);engine.trigger(false);};
-let manualHeld=false;
+let manualHeld=false;engine.addEventListener('panic',()=>{pendingKeys.clear();pointers.clear();manualHeld=false;highlightKeys();});
 $('#manual-gate').onpointerdown=safe(async e=>{manualHeld=true;e.target.setPointerCapture(e.pointerId);await engine.start();if(manualHeld)engine.on(60,1,'manual');highlightKeys();});
 for(const ev of ['pointerup','pointercancel','lostpointercapture'])$('#manual-gate').addEventListener(ev,()=>{manualHeld=false;engine.off('manual');highlightKeys();});
 $('#oct-down').onclick=()=>octave(-1);$('#oct-up').onclick=()=>octave(1);
 window.addEventListener('keydown',safe(async e=>{if(e.target.matches('input,select,textarea')||$('#guide').open||e.ctrlKey||e.metaKey||e.altKey)return;const key=e.key.toLowerCase();if(e.repeat)return;if(key==='escape'){patchBay.cancel();engine.panic();highlightKeys();return;}if(key==='z')return octave(-1);if(key==='x')return octave(1);if(key in keymap){e.preventDefault();pendingKeys.add(key);await engine.start();if(pendingKeys.has(key))engine.on(60+keymap[key],1,'key-'+key);highlightKeys();}}));
 window.addEventListener('keyup',e=>{const key=e.key.toLowerCase();pendingKeys.delete(key);if(key in keymap){engine.off('key-'+key);highlightKeys();}});
-window.addEventListener('blur',()=>{pendingKeys.clear();pointers.clear();engine.panic();highlightKeys();});
+window.addEventListener('blur',()=>{pendingKeys.clear();pointers.clear();engine.dropNotes(id=>String(id).startsWith('key-')||String(id).startsWith('pointer-')||id==='manual');manualHeld=false;highlightKeys();});
 window.addEventListener('beforeunload',e=>{if(tape.takes.length||tape.recording){e.preventDefault();e.returnValue='';}});
 
 function time(t){return `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}.${Math.floor(t%1*100).toString().padStart(2,'0')}`;}
@@ -138,10 +139,10 @@ function renderTakes(){
 }
 function drawWave(canvas,data){const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#adbf88';ctx.lineWidth=1;ctx.beginPath();for(let x=0;x<w;x++){const start=Math.floor(x*data.length/w),end=Math.max(start+1,Math.floor((x+1)*data.length/w));let peak=0;for(let i=start;i<end;i++)peak=Math.max(peak,Math.abs(data[i]));ctx.moveTo(x,h/2-peak*h*.46);ctx.lineTo(x,h/2+peak*h*.46);}ctx.stroke();}
 
-const scope=$('#scope'),ctx=scope.getContext('2d'),scopeData=new Float32Array(2048),micData=new Float32Array(1024),reels=$('#reels'),rc=reels.getContext('2d');let lastFrame=0;
+const scope=$('#scope'),ctx=scope.getContext('2d'),scopeData=new Float32Array(2048),micData=new Float32Array(2048),reels=$('#reels'),rc=reels.getContext('2d');let lastFrame=0;
 function animate(now){requestAnimationFrame(animate);if(now-lastFrame<33)return;lastFrame=now;const w=scope.width,h=scope.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#63784b25';ctx.lineWidth=1;ctx.beginPath();for(let x=0;x<w;x+=26){ctx.moveTo(x,0);ctx.lineTo(x,h);}for(let y=0;y<h;y+=20){ctx.moveTo(0,y);ctx.lineTo(w,y);}ctx.stroke();
-  if(engine.analyser){engine.analyser.getFloatTimeDomainData(scopeData);engine.micAnalyser.getFloatTimeDomainData(micData);for(const [data,color]of [[scopeData,'#ec9b59'],[micData,'#a5cbb3']]){ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.beginPath();for(let x=0;x<w;x++){const y=h/2-data[Math.floor(x*data.length/w)]*h*.42;if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();}}
-  $('#out-meter').value=Math.min(1,lastMeter.peak*engine.params.master);$('#mic-meter').value=lastMeter.mic;$('#ef-meter').style.width=Math.min(100,lastMeter.ef*10)+'%';
+  const running=engine.ctx?.state==='running';if(running&&engine.analyser){engine.analyser.getFloatTimeDomainData(scopeData);engine.micAnalyser.getFloatTimeDomainData(micData);for(const [data,color]of [[scopeData,'#ec9b59'],[micData,'#a5cbb3']]){ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.beginPath();for(let x=0;x<w;x++){const y=h/2-data[Math.floor(x*data.length/w)]*h*.42;if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();}}
+  $('#out-meter').value=running?Math.min(1,scopeData.reduce((peak,v)=>Math.max(peak,Math.abs(v)),0)):0;$('#mic-meter').value=running?Math.min(1,micData.reduce((peak,v)=>Math.max(peak,Math.abs(v)),0)):0;$('#ef-meter').style.width=(running?Math.min(100,lastMeter.ef*10):0)+'%';
   const elapsed=tape.recording?engine.ctx.currentTime-tape.recordStart:tape.playing?Math.max(0,engine.ctx.currentTime-tape.playStart):0;$('#tape-time').textContent=time(elapsed);
   rc.clearRect(0,0,300,112);const angle=(tape.playing||tape.recording)?now*.0015*tape.speed*(tape.reverse?-1:1):0;for(const x of [79,221]){rc.save();rc.translate(x,56);rc.rotate(angle);rc.strokeStyle='#9da990';rc.lineWidth=1;rc.fillStyle='#192114';rc.beginPath();rc.arc(0,0,46,0,Math.PI*2);rc.fill();rc.stroke();rc.beginPath();rc.arc(0,0,34,0,Math.PI*2);rc.stroke();for(let i=0;i<3;i++){rc.rotate(Math.PI*2/3);rc.fillStyle='#7c8a6a';rc.beginPath();rc.roundRect(-8,-37,16,28,6);rc.fill();}rc.fillStyle='#c4cfb5';rc.beginPath();rc.arc(0,0,5,0,Math.PI*2);rc.fill();rc.restore();}rc.strokeStyle='#b2a47d';rc.beginPath();rc.moveTo(80,102);rc.lineTo(220,102);rc.stroke();}
 requestAnimationFrame(animate);
@@ -149,3 +150,5 @@ for(const id of ['help','about'])$('#'+id).onclick=()=>$('#guide').showModal();$
 syncControls();renderRoutes();describePreset();
 // Diagnostic handle is enabled only on local development origins.
 if(['localhost','127.0.0.1'].includes(location.hostname))window.studio={engine,tape,defaults,controls};
+
+setupSessions({app:'arp-2600-studio',engine,tape,status,getPatch:()=>({version:1,params:engine.params,routes:engine.routes}),validatePatch:validatedPatch,loadPatch:p=>{engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Restored session.';}});

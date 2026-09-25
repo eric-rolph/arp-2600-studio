@@ -15,24 +15,24 @@ export class Tape extends EventTarget {
     this.capture.port.onmessage=({data:m})=>{if(m.type==='chunk')this.chunks.push(m.channels);if(m.type==='stopped'||m.type==='limit'){this.finish();if(m.type==='limit')this.dispatchEvent(new CustomEvent('notice',{detail:'The three-minute take limit was reached. Your recording was kept.'}));}};
   }
   async record(){await this.init();if(this.recording)return;if(this.takes.length>=8)throw new Error('Eight takes are loaded. Export or remove a take before recording another.');this.chunks=[];this.recording=true;this.recordStart=this.engine.ctx.currentTime;this.capture.port.postMessage('start');this.changed();}
-  stopRecord(){if(this.recording)this.capture.port.postMessage('stop');}
+  stopRecord(){if(!this.recording)return Promise.resolve();if(!this.stopping){this.stopping=new Promise(resolve=>this.resolveStop=resolve);this.capture.port.postMessage('stop');}return this.stopping;}
   finish(){if(!this.recording)return;this.recording=false;
     const frames=this.chunks.reduce((n,c)=>n+c[0].length,0);if(frames){const ctx=this.engine.ctx,wet=ctx.createBuffer(2,frames,ctx.sampleRate),dry=ctx.createBuffer(1,frames,ctx.sampleRate);let pos=0;
       for(const ch of this.chunks){wet.copyToChannel(ch[0],0,pos);wet.copyToChannel(ch[1],1,pos);dry.copyToChannel(ch[2],0,pos);pos+=ch[0].length;}
       this.takes.push({id:crypto.randomUUID(),name:`Take ${this.takes.length+1}`,wet,dry,wetGain:1,dryGain:0,offset:0,muted:false,rate:1,reverse:false});}
-    this.chunks=[];this.changed();
+    this.chunks=[];this.resolveStop?.();this.resolveStop=null;this.stopping=null;this.changed();
   }
-  async importFile(file){await this.init();if(this.takes.length>=8)throw new Error('Maximum eight takes.');if(file.size>50*1024*1024)throw new Error('Choose an audio file smaller than 50 MB.');
-    const b=await this.engine.ctx.decodeAudioData(await file.arrayBuffer());if(b.duration>180)throw new Error('Choose a recording of three minutes or less.');
-    this.takes.push({id:crypto.randomUUID(),name:file.name,wet:b,dry:null,wetGain:1,dryGain:0,offset:0,muted:false,rate:1,reverse:false});this.changed();
+  async importFile(file){await this.init();if(this.takes.length+(this.recording?1:0)>=8)throw new Error('Maximum eight takes, including the current recording.');if(file.size>50*1024*1024)throw new Error('Choose an audio file smaller than 50 MB.');
+    const b=await this.engine.ctx.decodeAudioData(await file.arrayBuffer());if(b.numberOfChannels>2)throw new Error('Choose a mono or stereo audio file.');if(b.duration>180)throw new Error('Choose a recording of three minutes or less.');
+    if(this.takes.length+(this.recording?1:0)>=8)throw new Error('Maximum eight takes, including the current recording.');this.takes.push({id:crypto.randomUUID(),name:file.name,wet:b,dry:null,wetGain:1,dryGain:0,offset:0,muted:false,rate:1,reverse:false});this.changed();
   }
   duration(){return Math.max(0,...this.takes.filter(t=>!t.muted).map(t=>t.offset+t.wet.duration/(this.speed*t.rate)));}
   reversed(ctx,b){const out=ctx.createBuffer(b.numberOfChannels,b.length,b.sampleRate);for(let c=0;c<b.numberOfChannels;c++)out.copyToChannel(b.getChannelData(c).slice().reverse(),c);return out;}
-  curve(){const curve=new Float32Array(8192),d=1+this.saturation*5;for(let i=0;i<curve.length;i++){const x=i*2/(curve.length-1)-1;curve[i]=Math.tanh(x*d)/Math.tanh(d);}return curve;}
+  curve(){const curve=new Float32Array(8192),d=1+this.saturation*5;for(let i=0;i<curve.length;i++){const x=i*2/(curve.length-1)-1;curve[i]=x*(1-this.saturation)+this.saturation*Math.tanh(x*d)/Math.tanh(d);}return curve;}
   updatePlayback(){
     if(!this.playing)return;const now=this.engine.ctx.currentTime;
     for(const layer of this.layers||[]){const rate=this.speed*layer.take.rate;layer.src.playbackRate.setTargetAtTime(rate,now,.015);layer.wg.gain.setTargetAtTime(rate*this.wow,now,.015);layer.fg.gain.setTargetAtTime(rate*this.flutter,now,.015);layer.gain.gain.setTargetAtTime(layer.take.muted?0:layer.take[layer.levelKey],now,.015);}
-    if(this.liveSat)this.liveSat.curve=this.curve();if(this.liveColor)this.liveColor.frequency.setTargetAtTime(18000/(1+this.saturation*.6),now,.015);
+    this.checkEnded();if(this.liveSat)this.liveSat.curve=this.curve();if(this.liveColor)this.liveColor.frequency.setTargetAtTime(18000/(1+this.saturation*.6),now,.015);
   }
   build(ctx,destination,start,forExport=false){
     const nodes=[],duration=this.duration(),bus=ctx.createGain(),color=ctx.createBiquadFilter(),sat=ctx.createWaveShaper();
@@ -45,11 +45,12 @@ export class Tape extends EventTarget {
       const wow=ctx.createOscillator(),flutter=ctx.createOscillator(),wg=ctx.createGain(),fg=ctx.createGain();
       wow.frequency.value=.63;flutter.frequency.value=8.7;wg.gain.value=rate*this.wow;fg.gain.value=rate*this.flutter;
       wow.connect(wg).connect(src.playbackRate);flutter.connect(fg).connect(src.playbackRate);wow.start(start);flutter.start(start);
-      src.start(start+take.offset);if(forExport){wow.stop(start+duration+.5);flutter.stop(start+duration+.5);}else{this.layers.push({src,gain,take,levelKey,wg,fg});src.onended=()=>{if(!this.playing)return;this.remaining--;if(this.remaining===0){if(this.loop)this.play().catch(()=>this.stop());else this.stop();}};}nodes.push(src,gain,wow,flutter,wg,fg);
+      src.start(start+take.offset);if(forExport){wow.stop(start+duration+.5);flutter.stop(start+duration+.5);}else{const layer={src,gain,take,levelKey,wg,fg,ended:false};this.layers.push(layer);src.onended=()=>{layer.ended=true;this.checkEnded();};}nodes.push(src,gain,wow,flutter,wg,fg);
     }
     return nodes;
   }
   async play(){await this.init();this.stop();if(!this.takes.some(t=>!t.muted))throw new Error('Record or import a take first.');this.playing=true;this.playStart=this.engine.ctx.currentTime+.03;this.nodes=this.build(this.engine.ctx,this.engine.bus,this.playStart);this.remaining=this.layers.length;this.changed();}
+  checkEnded(){if(this.playing&&this.layers?.length&&!this.layers.some(layer=>!layer.take.muted&&!layer.ended)){if(this.loop&&this.layers.some(layer=>!layer.take.muted)){this.playing=false;this.play().catch(()=>this.stop());}else this.stop();}}
   stop(){this.playing=false;for(const n of this.nodes){if('onended' in n)n.onended=null;try{n.stop?.();}catch{}try{n.disconnect();}catch{}}this.nodes=[];this.layers=[];this.changed();}
   async export(){await this.init();const duration=this.duration();if(!duration)throw new Error('Record a take before exporting.');
     if(duration>720)throw new Error('The mix exceeds 12 minutes. Increase tape speed or shorten track offsets.');

@@ -15,7 +15,7 @@ A browser synthesizer based on the ARP 2600, with microphone processing and a mu
 
 The keyboard starts monophonic with last-note priority. **DUO** splits lower/upper held notes across oscillator pitches while retaining shared envelopes. **Gate** is a manual envelope trigger. Touch allows multiple fingers. Phones show two octaves with octave switching. **Dock keys** keeps the keyboard visible while scrolling. **Panic** resets gates, feedback, and reverb.
 
-Audio processing and recordings stay in the browser. No microphone audio is sent to Cloudflare or GitHub. The Worker serves static application files. Takes are in memory, up to eight takes of three minutes each, and are not persisted. Patches can be stored in localStorage or exported as JSON.
+Audio processing and recordings stay in the browser. No microphone audio is sent to Cloudflare or GitHub. The Worker serves static application files. Takes are in memory, up to eight takes of three minutes each, unless you save them. **Save session** downloads the patch, tape settings and all takes as exact 32-bit float audio in a `.synthsession` file. **Open session** restores it in this studio. Save before reloading or closing. Patches can also be stored in localStorage or exported as JSON; patch files alone do not contain recordings.
 
 **Patch a microphone anywhere.** Enable the microphone, then click **Patch mic** in External input and choose any highlighted input. You can also drag **MIC OUT** to an input or select **Microphone** in the routing form. One output can feed several inputs. Mic gain sets its level; the destination's level or modulation fader controls its effect. Use **ENV** for voice-loudness control of envelopes or gates. Disconnecting the microphone keeps its cables for the next session within the page. Existing saved patches retain their microphone connections.
 
@@ -23,13 +23,15 @@ Patch memory contains 21 starting sounds, grouped by type. These include plucked
 
 ## Synthesis architecture
 
-- Three oscillators with PolyBLEP saw and pulse edges; VCO 2 also offers sine and integrated triangle. Oscillators and the nonlinear four-pole filter run at 2× the device sample rate.
+- Three oscillators with PolyBLEP saw and pulse edges; VCO 2 also offers sine and integrated triangle. Oscillators and the nonlinear four-pole filter run at 2× the audio context sample rate. Live audio requests a 48 kHz context; the browser converts to the output device when needed.
 - Per-oscillator pitch/FM, low-frequency range, coarse/fine tune, pulse width and VCO 2 PWM.
 - Normalled mixer inputs into the VCF; keyboard tracking, envelope and audio-rate cutoff modulation; resonance and input saturation.
 - ADSR and AR envelopes with patchable gates. VCA initial gain and separate envelope depths; ring and filter audio inputs.
 - Preamplifier, attack/release envelope follower, AC/DC ring multiplier, continuously colored noise, sample-and-hold, internal clock, electronic switch, signed voltage processor and lag.
 - A stereo spring-like delay-network reverb, DC rejection, bounded instrument output and a final monitoring limiter.
 - AudioWorklet-based capture into three PCM channels, non-destructive tape layers, variable-rate resampling, wow/flutter modulation, saturation, and offline WAV rendering.
+
+The [September audit](docs/audit.md) documents MIDI and envelope fixes, recording/session recovery, signal-meter corrections, sample-rate checks and remaining test limits.
 
 ## Fidelity boundary
 
@@ -56,11 +58,11 @@ npx.cmd playwright install chromium
 npm.cmd run test:browser
 ```
 
-Browser tests need the local server running. They use a synthetic microphone. They check mouse and touch cable dragging, keyboard patching, cancellation, target highlights, preset loading, voice input, recording, playback, WAV download and mobile layout. DSP tests check oscillator tuning, envelopes, voice gating, filter attenuation, feedback stability, WAV headers and audible output from every built-in preset. Physical hardware and analog equivalence require separate testing.
+Browser tests start the local server automatically; CI uses port 8788 for its isolated checkout. They use a synthetic microphone. They check mouse and touch cable dragging, keyboard patching, cancellation, target highlights, preset loading, voice input, recording, playback, WAV download and mobile layout. DSP tests check oscillator tuning, envelopes, voice gating, filter attenuation, feedback stability, WAV headers and audible output from every built-in preset. Physical hardware and analog equivalence require separate testing.
 
 ## Deployment from the Windows PC
 
-GitHub Actions runs on the private repository's self-hosted Windows runner `windows11-arp-2600`, label `arp-2600-studio`. Pushing to `main`, or manually running the deployment workflow, installs the lockfile dependencies, runs DSP checks, and deploys the Worker.
+GitHub Actions runs on the private repository's self-hosted Windows runner `windows11-arp-2600`, label `arp-2600-studio`. Pushing to `main`, or manually running the deployment workflow, installs the lockfile dependencies, runs DSP and browser checks, and deploys the Worker.
 
 The deployment script loads the current Windows user's DPAPI-encrypted credentials from:
 

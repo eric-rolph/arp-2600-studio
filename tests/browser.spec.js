@@ -79,8 +79,8 @@ test('cancelling or dropping on an output preserves existing routing and held no
  await jack(page,'v2sine','output').click();await page.locator('#preset').selectOption('Bass · plucked saw');await expect(page.locator('.pending-cable')).toHaveCount(0);
 });
 
-test('touch dragging patches without scrolling the page',async({browser})=>{
- const context=await browser.newContext({hasTouch:true,isMobile:true,viewport:{width:390,height:900}});const page=await context.newPage();await page.goto('http://127.0.0.1:8787');
+test('touch dragging patches without scrolling the page',async({browser,baseURL})=>{
+ const context=await browser.newContext({hasTouch:true,isMobile:true,viewport:{width:390,height:900}});const page=await context.newPage();await page.goto(baseURL);
  const output=jack(page,'v1saw','output'),input=jack(page,'v1fm','input');await input.scrollIntoViewIfNeeded();
  const a=await midpoint(output),b=await midpoint(input),scroll=await page.evaluate(()=>scrollY),cdp=await context.newCDPSession(page);
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});
