@@ -21,10 +21,10 @@ test('instrument, patching, voice, tape capture and WAV export work end to end',
 test('small screens retain all controls without page overflow',async({page})=>{await page.setViewportSize({width:390,height:844});await page.goto('/');expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);await page.locator('#preset').selectOption('Droid · voice + circuit');await page.screenshot({path:'test-results/mobile.png',fullPage:true});await expect(page.locator('#record')).toBeVisible();});
 test('live tape speed and gain changes preserve transport and pitch-duration relationship',async({page})=>{
  await page.goto('/');await page.locator('#power').click();
- await page.evaluate(async()=>{const ctx=studio.engine.ctx,b=ctx.createBuffer(1,48000*4,48000);for(let i=0;i<b.length;i++)b.getChannelData(0)[i]=.15*Math.sin(i/48000*Math.PI*2*440);studio.tape.takes.push({id:'test',name:'Calibration',wet:b,dry:null,wetGain:1,dryGain:0,offset:0,muted:false,rate:1,reverse:false});studio.tape.changed();await studio.tape.play();window.originalSource=studio.tape.layers[0].src;window.originalStart=studio.tape.playStart;});
+ await page.evaluate(async()=>{const ctx=studio.engine.ctx,b=ctx.createBuffer(1,48000*4,48000);for(let i=0;i<b.length;i++)b.getChannelData(0)[i]=.15*Math.sin(i/48000*Math.PI*2*440);studio.tape.takes.push({id:'test',name:'Calibration',wet:b,dry:null,wetGain:1,dryGain:0,offset:0,muted:false,rate:1,reverse:false});studio.tape.changed();await studio.tape.play();window.originalSource=studio.tape.player;window.originalStart=studio.tape.playStart;});
  await page.waitForTimeout(300);await page.locator('[data-speed="2"]').click();
- expect(await page.evaluate(()=>studio.tape.layers[0].src===window.originalSource&&studio.tape.playStart===window.originalStart)).toBe(true);
- expect(await page.evaluate(async()=>{const wav=await studio.tape.export(),v=new DataView(await wav.arrayBuffer());return v.getUint32(40,true)/4/studio.engine.ctx.sampleRate;})).toBeCloseTo(2.15,1);
+ expect(await page.evaluate(()=>studio.tape.player===window.originalSource&&studio.tape.playStart===window.originalStart)).toBe(true);
+ expect(await page.evaluate(async()=>{const wav=await studio.tape.export(),v=new DataView(await wav.arrayBuffer());return v.getUint32(40,true)/v.getUint32(28,true);})).toBeCloseTo(2.15,1);
  await page.locator('#tape-stop').click();
 });
 test('MIDI note, sustain, bend and controller messages affect the instrument',async({page})=>{

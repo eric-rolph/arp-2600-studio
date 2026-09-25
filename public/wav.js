@@ -1,0 +1,10 @@
+export function encodeWav(channels,rate,bits=16,{dither=false}={}){
+ if(![16,24,32].includes(bits)||!channels.length||channels.length>8||!Number.isInteger(rate)||rate<8000||rate>192000||channels.some(c=>c.length!==channels[0].length))throw new Error('Invalid WAV dimensions.');
+ const floating=bits===32,bytes=bits/8,length=channels[0].length,n=channels.length,extended=n>2,fmtSize=extended?40:16,header=12+8+fmtSize+(floating?12:0)+8,buffer=new ArrayBuffer(header+length*n*bytes),v=new DataView(buffer),str=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+ str(0,'RIFF');v.setUint32(4,buffer.byteLength-8,true);str(8,'WAVE');str(12,'fmt ');v.setUint32(16,fmtSize,true);v.setUint16(20,extended?65534:floating?3:1,true);v.setUint16(22,n,true);v.setUint32(24,rate,true);v.setUint32(28,rate*n*bytes,true);v.setUint16(32,n*bytes,true);v.setUint16(34,bits,true);
+ if(extended){v.setUint16(36,22,true);v.setUint16(38,bits,true);v.setUint32(40,n===4?0x33:0,true);v.setUint32(44,floating?3:1,true);v.setUint16(48,0,true);v.setUint16(50,0x10,true);new Uint8Array(buffer,52,8).set([0x80,0,0,0xaa,0,0x38,0x9b,0x71]);}
+ if(floating){const pos=20+fmtSize;str(pos,'fact');v.setUint32(pos+4,4,true);v.setUint32(pos+8,length,true);}str(header-8,'data');v.setUint32(header-4,length*n*bytes,true);
+ let seed=816923;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ for(let i=0;i<length;i++)for(let c=0;c<n;c++){let x=channels[c][i];if(!Number.isFinite(x))throw new Error('Cannot export nonfinite audio.');const offset=header+(i*n+c)*bytes;if(floating){v.setFloat32(offset,x,true);continue;}const scale=2**(bits-1);if(dither)x+=(random()-random())/scale;x=Math.max(-1,Math.min(1,x));const integer=Math.max(-scale,Math.min(scale-1,Math.round(x*(x<0?scale:scale-1))));if(bits===16)v.setInt16(offset,integer,true);else{v.setUint8(offset,integer&255);v.setUint8(offset+1,(integer>>8)&255);v.setUint8(offset+2,(integer>>16)&255);}}
+ return new Blob([buffer],{type:'audio/wav'});
+}

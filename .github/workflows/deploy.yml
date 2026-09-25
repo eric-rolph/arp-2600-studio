@@ -12,7 +12,7 @@ jobs:
   deploy:
     if: github.repository == 'eric-rolph/arp-2600-studio'
     runs-on: [self-hosted, Windows, X64, arp-2600-studio]
-    timeout-minutes: 15
+    timeout-minutes: 25
     defaults:
       run:
         shell: pwsh

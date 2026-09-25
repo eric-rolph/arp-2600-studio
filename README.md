@@ -1,4 +1,8 @@
 # 2600 Studio
+## Session and performance update
+
+Automatic local recovery now includes unfinished recordings. Shared transport, MIDI clock, cabinet clip banks/chains, overdub, draggable notes and automation, tape trims/fades, MIDI files and 24-bit/32-bit float WAV are available. The standalone 2600 also has performance capture, MIDI learn and patch undo/redo. TONTO adds frequency shifting, phasing and quad routing. See the [workflow, limits and validation guide](docs/studio-completion.md), including the remaining hardware-calibration work.
+
 
 A browser synthesizer based on the ARP 2600, with microphone processing and a multitrack tape recorder.
 
@@ -41,7 +45,7 @@ The [September audit](docs/audit.md) documents MIDI and envelope fixes, recordin
 
 This independent app models the 2600's routing and controls. ARP and Korg are not affiliated with it. Its sound has not been measured against a physical 2600.
 
-The oscillator spectra, 4012/4072 filter differences, envelope curves, component tolerances, physical spring dispersion and magnetic tape hysteresis are approximations. Arbitrary feedback connections have a causal processing delay. Control scaling and the panel layout are adapted for browser use. Stereo tape layers share the global tape coloration; each take can have its own speed and direction. The keyboard is duophonic, not independently polyphonic. Tape loops may have a short transport gap at the boundary. Hardware MIDI and microphone latency depend on device/browser settings.
+The oscillator spectra, 4012/4072 filter differences, envelope curves, component tolerances, physical spring dispersion and magnetic tape hysteresis are approximations. Arbitrary feedback connections have a causal processing delay. Control scaling and the panel layout are adapted for browser use. Stereo tape layers share the global tape coloration; each take can have its own speed and direction. The keyboard is duophonic, not independently polyphonic. Tape loop scheduling runs in an AudioWorklet; discontinuous audio still needs an appropriate edit or fades. Hardware MIDI and microphone latency depend on device/browser settings.
 
 Reference: [Korg original 2600 manual, patch book, and 3620 manual](https://www.korg.com/us/support/download/product/0/842/). The manual informs behavior; its artwork, scans, and proprietary software are not redistributed. Browser references: [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet), [Web MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API).
 

@@ -1,3 +1,12 @@
+import {setupCalibration} from './calibration-ui.js';
+import {setupParts} from './parts-ui.js';
+import {setupTransport} from './transport-ui.js';
+import {setupPerformanceEditor} from './performance-editor.js';
+import {setupTapeEditing} from './tape-edit.js';
+import {setupRecovery} from './recovery.js';
+import {setupPerformance} from './performance-ui.js';
+import {setupHistory} from './history.js';
+import {validatePatch as validateState} from './patch-state.js';
 import {setupLibrary} from './library-ui.js';
 import {cleanName,uniqueName} from './library-bank.js';
 import {setupInterface} from './interface.js';
@@ -60,21 +69,21 @@ function fillPresets(){
 }
 function describePreset(){const name=$('#preset').value;$('#preset-note').textContent=presetNotes[name]||userPresets[name.slice(5)]?.library?.description||'Saved in this browser.';}
 
-function validatedPatch(patch){if(!patch||typeof patch!=='object'||!patch.params||!patch.routes)throw new Error('Choose a 2600 Studio patch JSON file.');const params={...defaults},routes={};for(const [key,value]of Object.entries(patch.params)){if(!Object.hasOwn(defaults,key)||!Number.isFinite(value))continue;const cfg=controls.get(key);params[key]=cfg?Math.max(cfg.min,Math.min(cfg.max,value)):key==='vibratoRate'?Math.max(.1,Math.min(20,value)):key==='octave'?Math.max(-3,Math.min(3,Math.round(value))):key==='bend'?Math.max(-2,Math.min(2,value)):Math.max(0,Math.min(1,value));}for(const [dest,src]of Object.entries(patch.routes))if(Object.hasOwn(normal,dest)&&Object.hasOwn(sourceNames,src))routes[dest]=src;return{version:1,params,routes};}
-$('#preset').onchange=()=>{const value=$('#preset').value,patch=value.startsWith('user:')?userPresets[value.slice(5)]:presets[value]||userPresets[value];if(!patch)return;const p=validatedPatch(patch);engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();describePreset();status('Loaded '+$('#preset').selectedOptions[0].textContent+'.');};
+function validatedPatch(patch){return validateState(patch);}
+$('#preset').onchange=()=>{const value=$('#preset').value,patch=value.startsWith('user:')?userPresets[value.slice(5)]:presets[value]||userPresets[value];if(!patch)return;const p=validatedPatch(patch);if(!value.startsWith('user:')&&!userPresets[value])Object.assign(p,{performance:structuredClone(engine.state.performance),sharedPerformance:structuredClone(engine.state.sharedPerformance),parts:structuredClone(engine.state.parts),partFocus:engine.state.partFocus,calibration:structuredClone(engine.state.calibration)});engine.panic();engine.load(p.params,p.routes,p);patchBay.cancel();syncControls();drawCables();renderRoutes();describePreset();status('Loaded '+$('#preset').selectedOptions[0].textContent+'.');};
 function writeMemories(next){const current=$('#preset').value;localStorage.setItem('2600-patches',JSON.stringify(next));userPresets=next;fillPresets();$('#preset').value=current;}
-$('#save-patch').onclick=safe(()=>{const requested=prompt('Name this patch:','My patch');if(!requested?.trim())return;const name=uniqueName('User · '+cleanName(requested),userPresets),next=Object.assign(Object.create(null),userPresets,{[name]:validatedPatch({params:engine.params,routes:engine.routes})});writeMemories(next);$('#preset').value='user:'+name;describePreset();status('Patch saved in this browser.');});
+$('#save-patch').onclick=safe(()=>{const requested=prompt('Name this patch:','My patch');if(!requested?.trim())return;const name=uniqueName('User · '+cleanName(requested),userPresets),next=Object.assign(Object.create(null),userPresets,{[name]:validatedPatch(engine.state)});writeMemories(next);$('#preset').value='user:'+name;describePreset();status('Patch saved in this browser.');});
 window.addEventListener('storage',e=>{if(e.key!=='2600-patches')return;try{const next=Object.create(null),current=$('#preset').value;for(const [name,p]of Object.entries(JSON.parse(e.newValue||'{}')))try{next[cleanName(name)]={...validatedPatch(p),...(p.library?{library:p.library}:{})};}catch{}userPresets=next;fillPresets();$('#preset').value=current;}catch{}});
-setupLibrary({studio:'arp-2600-studio',entries:arpLibrary,getSaved:()=>userPresets,writeSaved:writeMemories,capture:()=>validatedPatch({params:engine.params,routes:engine.routes}),validate:validatedPatch,routeName:id=>sourceNames[id]||destNames[id]||id,load:entry=>{const p=validatedPatch(entry.patch);engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset').value=entry.user?'user:'+entry.name:entry.name;$('#preset-note').textContent=entry.description+' '+entry.play;status('Loaded '+entry.name+'.');}});
-$('#export-patch').onclick=()=>download(new Blob([JSON.stringify({version:1,params:engine.params,routes:engine.routes},null,2)],{type:'application/json'}),'2600-patch.json');
-$('#import-patch').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw new Error('Patch file is too large.');const p=validatedPatch(JSON.parse(await file.text()));engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Imported patch.';status('Patch imported.');e.target.value='';});fillPresets();
+setupLibrary({studio:'arp-2600-studio',entries:arpLibrary,getSaved:()=>userPresets,writeSaved:writeMemories,capture:()=>validatedPatch(engine.state),validate:validatedPatch,routeName:id=>sourceNames[id]||destNames[id]||id,load:entry=>{const p=validatedPatch(entry.patch);if(!entry.user)Object.assign(p,{performance:structuredClone(engine.state.performance),sharedPerformance:structuredClone(engine.state.sharedPerformance),parts:structuredClone(engine.state.parts),partFocus:engine.state.partFocus,calibration:structuredClone(engine.state.calibration)});engine.panic();engine.load(p.params,p.routes,p);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset').value=entry.user?'user:'+entry.name:entry.name;$('#preset-note').textContent=entry.description+' '+entry.play;status('Loaded '+entry.name+'.');}});
+$('#export-patch').onclick=()=>download(new Blob([JSON.stringify(engine.state,null,2)],{type:'application/json'}),'2600-patch.json');
+$('#import-patch').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>16000000)throw new Error('Patch file is too large.');const p=validatedPatch(JSON.parse(await file.text()));engine.panic();engine.load(p.params,p.routes,p);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Imported patch.';status('Patch imported.');e.target.value='';});fillPresets();
 
 for(const [id,name]of sources)$('#route-source').add(new Option(name,id));for(const [id,name]of destinations)$('#route-dest').add(new Option(name,id));
 function doPatch(dest,src){patchBay.cancel();engine.patch(dest,src);drawCables();renderRoutes();const micHint=(src==='preamp'||src==='ef')&&!engine.micStream?' Enable Microphone to send a signal.':'';status(src?`Connected ${sourceNames[src]} to ${destNames[dest]}.${micHint}`:`${destNames[dest]} restored to ${sourceNames[normal[dest]]}.`);}
 const patchBay=new PatchBay({rack:$('#rack'),cables:$('#cables'),hint:$('#patch-hint'),routes:()=>engine.routes,onPatch:doPatch,status,sourceNames,destNames});
 $('#patch-mic').onclick=()=>{patchBay.begin($('[data-jack="preamp"][data-type="output"]'));if(!engine.micStream)status('Choose any green-ringed input. Enable Microphone to send a signal.');};
 $('#connect-route').onclick=()=>doPatch($('#route-dest').value,$('#route-source').value);
-$('#clear-patch').onclick=()=>{engine.routes={};engine.send('routes',{routes:{}});patchBay.cancel();drawCables();renderRoutes();status('All patch cables removed. Internal connections restored.');};
+$('#clear-patch').onclick=()=>{engine.routes={};engine.configure();patchBay.cancel();drawCables();renderRoutes();status('All patch cables removed. Internal connections restored.');};
 $('#dock-keys').onclick=()=>{const on=$('.keyboard-panel').classList.toggle('docked');$('#dock-keys').setAttribute('aria-pressed',String(on));};
 $('#show-normals').onclick=()=>{const open=$('#routing').hidden;$('#routing').hidden=!open;$('#show-normals').setAttribute('aria-pressed',String(open));};
 function renderRoutes(){const container=$('#route-list');container.replaceChildren();for(const [dest,src] of Object.entries(engine.routes)){const chip=document.createElement('span');chip.className='route-chip';chip.append(document.createTextNode(`${sourceNames[src]} → ${destNames[dest]}`));const button=document.createElement('button');button.textContent='×';button.setAttribute('aria-label',`Remove ${sourceNames[src]} to ${destNames[dest]}`);button.onclick=()=>doPatch(dest,null);chip.append(button);container.append(chip);}}
@@ -129,7 +138,7 @@ window.addEventListener('beforeunload',e=>{if(tape.takes.length||tape.recording)
 function time(t){return `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}.${Math.floor(t%1*100).toString().padStart(2,'0')}`;}
 $('#record').onclick=safe(async()=>{if(tape.recording){tape.stopRecord();return;}await power();await tape.record();status('Recording synth and dry microphone. Stop to keep this take.');});
 $('#tape-stop').onclick=()=>{tape.stopRecord();tape.stop();};$('#tape-play').onclick=safe(async()=>{await power();await tape.play();status('Tape playback started. Play or record another pass over it.');});
-function tapeChange(restart=false){if(tape.playing){if(restart)tape.play().catch(e=>status(e.message,true));else tape.updatePlayback();}}
+function tapeChange(){tape.updatePlayback();}
 function setSpeed(speed){tape.speed=speed;$('#tape-speed').value=Math.log2(speed);$('#speed-readout').textContent=`${speed.toFixed(2)}× · ${(12*Math.log2(speed)>=0?'+':'')+(12*Math.log2(speed)).toFixed(1)} st`;$$('[data-speed]').forEach(b=>b.classList.toggle('active',Math.abs(+b.dataset.speed-speed)<.001));tapeChange();}
 $('#tape-speed').oninput=e=>{setSpeed(2**Number(e.target.value));};$$('[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
 for(const key of ['saturation','wow','flutter'])$('#'+key).oninput=e=>{tape[key]=+e.target.value;tapeChange();};
@@ -142,7 +151,7 @@ function renderTakes(){
   const root=$('#takes');root.replaceChildren();if(!tape.takes.length){root.innerHTML='<div class="empty-tape">No recordings yet.<span>Press Record to capture the synth and microphone.</span></div>';return;}
   for(const take of tape.takes){const card=document.createElement('div');card.className='take';const title=document.createElement('div'),heading=document.createElement('h3');heading.textContent=take.name;const meta=document.createElement('small');meta.textContent=`${time(take.wet.duration)} / ${take.dry?'2 STEMS':'IMPORTED'}`;title.append(heading,meta);const buttons=document.createElement('div');buttons.className='take-buttons';for(const [kind,label]of [['wet','Synth WAV'],['dry','Voice WAV']]){if(kind==='dry'&&!take.dry)continue;const b=document.createElement('button');b.textContent=label;b.onclick=safe(()=>download(tape.stem(take,kind),`${take.name}-${kind}.wav`));buttons.append(b);}title.append(buttons);const canvas=document.createElement('canvas');canvas.width=550;canvas.height=55;canvas.className='take-wave';const ctrl=document.createElement('div');ctrl.className='take-controls';
     for(const [key,label,min,max,step]of [['wetGain','SYNTH',0,1.5,.01],['dryGain','DRY VOICE',0,1.5,.01],['rate','SPEED ×',.25,4,.01],['offset','START s',0,60,.1]]){if(key==='dryGain'&&!take.dry)continue;const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.type=(key==='offset'||key==='rate')?'number':'range';input.min=min;input.max=max;input.step=step;input.value=take[key];input.setAttribute('aria-label',`${take.name} ${label}`);input.oninput=()=>{const value=+input.value;if(!Number.isFinite(value))return;take[key]=Math.max(min,Math.min(max,value));tapeChange(key==='offset');};l.append(input);ctrl.append(l);}
-    for(const [key,label]of [['muted','Mute'],['reverse','Reverse']]){const button=document.createElement('button');button.textContent=label;button.classList.toggle('active',take[key]);button.setAttribute('aria-pressed',String(take[key]));button.onclick=()=>{take[key]=!take[key];tapeChange(key==='reverse');renderTakes();};ctrl.append(button);}const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Delete '+take.name);del.onclick=()=>{if(!confirm(`Remove ${take.name}? Export it first if you want to keep it.`))return;tape.stop();tape.takes=tape.takes.filter(t=>t!==take);renderTakes();};ctrl.append(del);card.append(title,canvas,ctrl);root.append(card);drawWave(canvas,take.wet.getChannelData(0));}
+    for(const [key,label]of [['muted','Mute'],['reverse','Reverse']]){const button=document.createElement('button');button.textContent=label;button.classList.toggle('active',take[key]);button.setAttribute('aria-pressed',String(take[key]));button.onclick=()=>{take[key]=!take[key];tapeChange(key==='reverse');renderTakes();};ctrl.append(button);}const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Delete '+take.name);del.onclick=()=>{if(!confirm(`Remove ${take.name}? Export it first if you want to keep it.`))return;tape.stop();tape.takes=tape.takes.filter(t=>t!==take);tape.changed();};ctrl.append(del);card.append(title,canvas,ctrl);root.append(card);drawWave(canvas,take.wet.getChannelData(0));}
 }
 function drawWave(canvas,data){const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#adbf88';ctx.lineWidth=1;ctx.beginPath();for(let x=0;x<w;x++){const start=Math.floor(x*data.length/w),end=Math.max(start+1,Math.floor((x+1)*data.length/w));let peak=0;for(let i=start;i<end;i++)peak=Math.max(peak,Math.abs(data[i]));ctx.moveTo(x,h/2-peak*h*.46);ctx.lineTo(x,h/2+peak*h*.46);}ctx.stroke();}
 
@@ -158,6 +167,23 @@ syncControls();renderRoutes();describePreset();
 // Diagnostic handle is enabled only on local development origins.
 if(['localhost','127.0.0.1'].includes(location.hostname))window.studio={engine,tape,defaults,controls};
 
-setupSessions({app:'arp-2600-studio',engine,tape,status,getPatch:()=>({version:1,params:engine.params,routes:engine.routes}),validatePatch:validatedPatch,loadPatch:p=>{engine.panic();engine.load(p.params,p.routes);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Restored session.';}});
+setupSessions({app:'arp-2600-studio',engine,tape,status,getPatch:()=>engine.state,validatePatch:validatedPatch,loadPatch:p=>{engine.panic();engine.load(p.params,p.routes,p);patchBay.cancel();syncControls();drawCables();renderRoutes();$('#preset-note').textContent='Restored session.';}});
 
+const memory=document.createElement('section');memory.id='performance-memory';$('.tape-deck').before(memory);
+const performanceUI=setupPerformance({engine,root:memory,power,safe,status,syncControls,format:(value,c)=>fmt(value,c.unit)});
+const history=setupHistory({engine,load:p=>{engine.load(p.params,p.routes,p);patchBay.cancel();syncControls();drawCables();renderRoutes();},status});
+if(window.studio)Object.assign(window.studio,{performanceUI,history});
+setupRecovery({app:'arp-2600-studio',engine,tape,getPatch:()=>engine.state,loadPatch:p=>{engine.load(p.params,p.routes,p);syncControls();drawCables();renderRoutes();},status});
+
+
+setupTapeEditing({tape});
+
+setupPerformanceEditor({engine,performanceUI,status});
+
+setupParts({engine,performanceUI,status,ids:['arp']});
+setupTransport({engine,tape,performanceUI,power,safe,status});
+
+setupCalibration({engine,tape,status,ids:['arp','tape']});
+
+const studioNavigation=document.querySelector('.rack-nav');if(studioNavigation){for(const [id,label]of [['studio-transport','Transport'],['instrument-parts','Parts'],['clip-editor','Clip editor']]){const a=document.createElement('a');a.href='#'+id;a.textContent=label;studioNavigation.querySelector('a[href="#performance-memory"]').before(a);}}
 setupInterface();

@@ -1,0 +1,42 @@
+{
+  "sampleRate": 48000,
+  "state": "running",
+  "maxOutputChannels": 2,
+  "baseLatency": 0.01,
+  "outputLatency": 0.042,
+  "midiStatus": "2 MIDI inputs connected.",
+  "midiInputs": [
+    {
+      "name": "Keystation 49 MK3",
+      "state": "connected",
+      "connection": "open"
+    },
+    {
+      "name": "MIDIIN2 (Keystation 49 MK3)",
+      "state": "connected",
+      "connection": "open"
+    }
+  ],
+  "midiOutputs": [
+    {
+      "name": "Keystation 49 MK3",
+      "state": "connected",
+      "connection": "closed"
+    },
+    {
+      "name": "MIDIOUT2 (Keystation 49 MK3)",
+      "state": "connected",
+      "connection": "closed"
+    }
+  ],
+  "audioDevices": [
+    {
+      "kind": "audioinput",
+      "label": ""
+    },
+    {
+      "kind": "audiooutput",
+      "label": ""
+    }
+  ]
+}
