@@ -56,7 +56,7 @@ export class SynthCore {
     this.follow=0;this.clockPhase=0;this.lfoPhase=0;this.sh=0;this.shHigh=false;this.switchState=false;this.lag=0;
     this.ringPrev=0;this.ringDC=0;this.outPrev=0;this.outDC=0;this.frame=0;this.peak=0;this.micPeak=0;
   }
-  set(values){for(const [k,v] of Object.entries(values))if(k in defaults&&Number.isFinite(v))this.target[k]=v;}
+  set(values){for(const [k,v] of Object.entries(values))if(Object.hasOwn(defaults,k)&&Number.isFinite(v))this.target[k]=v;}
   patch(routes){this.routes={...routes};}
   input(id){return clamp(this.signals[this.routes[id]||normal[id]]||0,-20,20);}
   noteOn(note,velocity=1,retrigger=true,lower=note,upper=note){this.note=note;this.lowerNote=lower;this.upperNote=upper;this.velocity=velocity;this.gate=true;this.retrigger=retrigger;}

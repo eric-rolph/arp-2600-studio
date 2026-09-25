@@ -39,10 +39,10 @@ export const destinations = [
 export const normal = Object.fromEntries(destinations.map(([id,,src])=>[id,src]));
 export const presets = {
  'Init · classic lead': {params:{},routes:{}},
- 'Droid · voice + circuit': {params:{v1coarse:12,v1level:.08,v2level:.12,v2coarse:12,ringLevel:.75,micLevel:.3,preamp:2.5,efGain:2.2,filterEnv:3,cutoff:1800,resonance:.32,vcaAdsr:.95,filterFM:.08,vibrato:.05,reverb:.12},routes:{ringA:'preamp',ringB:'v2sine',filterEnv:'ef',vcaCV:'ef'}},
+ 'Droid · voice + circuit': {params:{v1coarse:12,v1level:.08,v2level:.12,v2coarse:12,ringLevel:.75,micLevel:.3,preamp:6,efGain:3.5,filterEnv:3,cutoff:1800,resonance:.32,vcaAdsr:.95,filterFM:.08,vibrato:.05,reverb:.12},routes:{ringA:'preamp',ringB:'v2sine',filterEnv:'ef',vcaCV:'ef'}},
  'Droid · questioning chirp': {params:{v1level:0,v2level:.8,v2coarse:24,v2fm:1.7,attack:.004,decay:.18,sustain:0,release:.08,filterEnv:3,cutoff:1800,resonance:.6,reverb:.25},routes:{filter2:'v2sine'}},
  'Droid · sample & chatter': {params:{v1level:.6,v1coarse:12,v1fm:1.8,v2level:.18,v2coarse:24,clock:13,cutoff:2800,resonance:.35,attack:.002,decay:.1,sustain:.7,release:.06},routes:{}},
  'Warm · three oscillators': {params:{v1level:.45,v2level:.32,v3level:.25,v3coarse:0,v2fine:7,v3fine:-8,cutoff:950,filterEnv:2.4,attack:.35,release:1.8,reverb:.3},routes:{filter2:'v2saw'}},
  'Metal · ring percussion': {params:{v1level:0,v2level:0,ringLevel:.9,v1coarse:-7,v2coarse:13,attack:.001,decay:.5,sustain:0,release:.15,cutoff:5000,filterEnv:0,reverb:.25},routes:{}},
- 'Voice · filter follower': {params:{v1level:0,v2level:0,micLevel:1,preamp:2,efGain:2,vcaAdsr:1,cutoff:350,filterEnv:4,resonance:.6,reverb:.15},routes:{filterEnv:'ef',vcaCV:'ef'}},
+ 'Voice · filter follower': {params:{v1level:0,v2level:0,micLevel:1,preamp:4,efGain:4,vcaAdsr:1,cutoff:350,filterEnv:4,resonance:.6,reverb:.15},routes:{filterEnv:'ef',vcaCV:'ef'}},
 };

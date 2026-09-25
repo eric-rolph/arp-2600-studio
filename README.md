@@ -13,7 +13,7 @@ A playable ARP 2600-inspired semi-modular browser instrument and voice/tape stud
 5. **Record** preserves stereo synth and a separate mono preamplified voice stem. **Stop** keeps the take. Existing takes can play while recording another pass; the previous take is not destructively baked into the new recording.
 6. Tape speed links pitch and duration. Levels, speed, saturation, wow and flutter update during playback without restarting it. Reverse and start-offset changes restart transport. Each layer has an independent speed, offset, reverse and mute. Export a stereo WAV mix or original stems before closing the page.
 
-The keyboard starts monophonic with last-note priority. **DUO** splits lower/upper held notes across oscillator pitches while retaining shared envelopes. **Gate** is a manual envelope trigger. Touch allows multiple fingers. **Panic** resets gates, feedback, and reverb.
+The keyboard starts monophonic with last-note priority. **DUO** splits lower/upper held notes across oscillator pitches while retaining shared envelopes. **Gate** is a manual envelope trigger. Touch allows multiple fingers. Phones show two octaves with octave switching. **Dock keys** keeps the keyboard visible while scrolling. **Panic** resets gates, feedback, and reverb.
 
 Audio processing and recordings stay in the browser. No microphone audio is sent to Cloudflare or GitHub. The Worker serves static application files. Takes are in memory, up to eight takes of three minutes each, and are not persisted. Patches can be stored in localStorage or exported as JSON.
 
