@@ -1,6 +1,6 @@
 # 2600 Studio
 
-A playable ARP 2600-inspired semi-modular browser instrument and voice/tape studio.
+A browser synthesizer based on the ARP 2600, with microphone processing and a multitrack tape recorder.
 
 **Live:** https://arp-2600-studio.ericrolph.workers.dev
 
@@ -9,13 +9,15 @@ A playable ARP 2600-inspired semi-modular browser instrument and voice/tape stud
 1. Open the site in current Chrome or Edge and press **Power on**.
 2. Play the four-octave keyboard with touch/mouse or computer keys `A W S E D F T G Y H U J K`. `Z/X` shift octaves. MIDI supports note on/off, velocity, ±2-semitone pitch bend, modulation, sustain, and CC 7/71/72/73/74.
 3. Select **Droid · voice + circuit**, put on headphones, and enable **Microphone**. Speak and play together. Vocal dynamics control the filter and VCA; the voice is multiplied by VCO 2's sine wave in the ring modulator.
-4. Click an output jack and then an input jack to replace its internal connection. Click a connected input to restore its normal. **Show signal path** provides the equivalent accessible routing form. Output fan-out is allowed. Input ports accept one cable.
+4. Click a jack to draw out a cable that follows the pointer. Green rings mark compatible jacks. Click a target to connect, or drag between the jacks and release. You can start at either end. Click a connected input to remove its cable and restore the internal connection. Escape cancels a loose cable. You can also use Tab and Enter or Space, or the routing form under **Show signal path**. An output can feed several inputs. Each input accepts one cable.
 5. **Record** preserves stereo synth and a separate mono preamplified voice stem. **Stop** keeps the take. Existing takes can play while recording another pass; the previous take is not destructively baked into the new recording.
 6. Tape speed links pitch and duration. Levels, speed, saturation, wow and flutter update during playback without restarting it. Reverse and start-offset changes restart transport. Each layer has an independent speed, offset, reverse and mute. Export a stereo WAV mix or original stems before closing the page.
 
 The keyboard starts monophonic with last-note priority. **DUO** splits lower/upper held notes across oscillator pitches while retaining shared envelopes. **Gate** is a manual envelope trigger. Touch allows multiple fingers. Phones show two octaves with octave switching. **Dock keys** keeps the keyboard visible while scrolling. **Panic** resets gates, feedback, and reverb.
 
 Audio processing and recordings stay in the browser. No microphone audio is sent to Cloudflare or GitHub. The Worker serves static application files. Takes are in memory, up to eight takes of three minutes each, and are not persisted. Patches can be stored in localStorage or exported as JSON.
+
+Patch memory contains 21 starting sounds, grouped by type. These include plucked and sine bass, pulse-width and portamento leads, electric piano, strings, kick, snare, hi-hat, random filter modulation, and voice patches. Each patch has a description below the selector. These are presets for this app, not copies of factory patch sheets.
 
 ## Synthesis architecture
 
@@ -29,7 +31,7 @@ Audio processing and recordings stay in the browser. No microphone audio is sent
 
 ## Fidelity boundary
 
-This is an independently developed digital homage, not an official ARP/Korg product. Routing and performance concepts follow the 2600; it is **not certified as a circuit-exact reproduction**. There are no measurements of a physical reference instrument in this repository.
+This independent app models the 2600's routing and controls. ARP and Korg are not affiliated with it. Its sound has not been measured against a physical 2600.
 
 The oscillator spectra, 4012/4072 filter differences, envelope curves, component tolerances, physical spring dispersion and magnetic tape hysteresis are approximations. Arbitrary feedback connections have a causal processing delay. Control scaling and the panel layout are adapted for browser use. Stereo tape layers share the global tape coloration; each take can have its own speed and direction. The keyboard is duophonic, not independently polyphonic. Tape loops may have a short transport gap at the boundary. Hardware MIDI and microphone latency depend on device/browser settings.
 
@@ -52,7 +54,7 @@ npx.cmd playwright install chromium
 npm.cmd run test:browser
 ```
 
-Browser tests need the local server running. They use a synthetic microphone, not physical hardware. They verify sound energy, patch/unpatch, voice input, two-stem recording, playback, WAV download and mobile layout. DSP tests check oscillator tuning, envelopes, voice gating, filter attenuation, feedback stability and WAV headers. These tests establish functionality, not measured analog equivalence.
+Browser tests need the local server running. They use a synthetic microphone. They check mouse and touch cable dragging, keyboard patching, cancellation, target highlights, preset loading, voice input, recording, playback, WAV download and mobile layout. DSP tests check oscillator tuning, envelopes, voice gating, filter attenuation, feedback stability, WAV headers and audible output from every built-in preset. Physical hardware and analog equivalence require separate testing.
 
 ## Deployment from the Windows PC
 

@@ -13,4 +13,15 @@ dialog{background:#22281f;color:var(--cream);border:1px solid #747b65;border-rad
 .keyboard-panel.docked{position:sticky;bottom:8px;z-index:6;box-shadow:0 -5px 18px #0005}.jack{min-width:19px}.module-toggle input[type=range]{width:100%;min-width:0}
 
 .keyboard-extras{display:flex;align-items:center;gap:12px}.keyboard-extras label{display:flex;flex-direction:row;align-items:center;font:10px var(--mono)}.keyboard-extras input{width:auto;height:auto}.keyboard-extras button{padding:2px 9px;font-size:10px}.keyboard-controls{gap:3px}
+.preset-note{margin:10px 0 0;color:#c1c9b7;font-size:13px;line-height:1.5;max-width:850px}
+.jack{touch-action:none;cursor:crosshair}
+.jack::before{content:"";position:absolute;inset:-7px;border-radius:50%}
+.jack.patch-target::after{content:"";position:absolute;inset:-7px;border:1px solid #acd5b680;border-radius:50%;box-shadow:0 0 7px #a5cbb326;pointer-events:none}
+.jack.patch-hover::after{border-color:#c9f3cb;box-shadow:0 0 9px #a5cbb380;background:#9dceae18}
+.jack.patch-hover{border-color:#d2efcc}
+.patch-preview{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:20}
+.pending-cable{fill:none;stroke-width:3.5;stroke-linecap:round}
+.cable-tip{stroke:#e5e8d8;stroke-width:1.5}
+.patch-dragging{user-select:none;cursor:grabbing}
+.patch-dragging .jack{cursor:grabbing}
 @media(max-width:560px){.module[aria-label="Voltage controlled filter"],.module[aria-label="Envelope generators"]{grid-column:span 8}.module h2{font-size:13px}.fader>span,.fader output,.jack-label{font-size:11px}.keyboard{height:110px}.key span{font-size:11px}.key.black span{display:block;font-size:9px}.keyboard-controls{gap:7px}.key[hidden]{display:none}}

@@ -24,3 +24,12 @@ test('ADSR sustains and releases; a held gate does not continuously retrigger',(
 test('resonant filter and audio feedback stay finite at extreme settings',()=>{const s=new SynthCore();s.set({...defaults,cutoff:18000,resonance:.98,vcaInitial:1,filterFM:3,drive:1});s.patch({filter1:'vca',filter2:'noise',filterFM:'vcf'});for(let i=0;i<48000;i++){const out=s.tick();assert.ok(out.every(Number.isFinite));assert.ok(Math.abs(out[0])<=1);}});
 test('four-pole filter attenuates high frequencies',()=>{function energy(hz){const f=new Ladder();let sum=0;for(let i=0;i<48000;i++){const y=f.tick(Math.sin(i/48000*2*Math.PI*hz)*.1,800,0,48000,0);if(i>10000)sum+=y*y;}return sum;}assert.ok(energy(6000)<energy(100)*.002);});
 test('WAV export has correct PCM format, channels, length and clipping',async()=>{const blob=encodeWav([new Float32Array([0,1,-2]),new Float32Array([.5,-1,0])],48000);const v=new DataView(await blob.arrayBuffer());assert.equal(v.byteLength,56);assert.equal(v.getUint16(22,true),2);assert.equal(v.getUint32(24,true),48000);assert.equal(v.getInt16(52,true),-32768);});
+test('every built-in preset produces finite, audible output',()=>{
+  for(const [name,patch]of Object.entries(presets)){
+    const synth=new SynthCore(48000);synth.params={...defaults,...patch.params};synth.target={...synth.params};synth.patch(patch.routes);synth.noteOn(60);
+    let energy=0,peak=0;
+    const needsMic=name.toLowerCase().includes('voice');
+    for(let i=0;i<60000;i++){const mic=needsMic?.2*Math.sin(i/48000*Math.PI*2*170):0;const [value]=synth.tick(mic);energy+=value*value;peak=Math.max(peak,Math.abs(value));}
+    assert.ok(Number.isFinite(energy),`${name}: finite samples`);assert.ok(peak<=1,`${name}: bounded output`);assert.ok(Math.sqrt(energy/60000)>.0005,`${name}: audible output`);
+  }
+});

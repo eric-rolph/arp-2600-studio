@@ -34,3 +34,65 @@ test('MIDI note, sustain, bend and controller messages affect the instrument',as
  await page.evaluate(()=>{fakeMidi.onmidimessage({data:[0xb0,64,0]});fakeMidi.onmidimessage({data:[0xe0,127,127]});fakeMidi.onmidimessage({data:[0xb0,74,64]});});
  expect(await page.evaluate(()=>studio.engine.notes.size)).toBe(0);expect(await page.evaluate(()=>studio.engine.params.bend)).toBeGreaterThan(1.99);expect(await page.evaluate(()=>studio.engine.params.cutoff)).toBeGreaterThan(500);
 });
+
+const jack=(page,id,type)=>page.locator(`[data-jack="${id}"][data-type="${type}"]`);
+const midpoint=async locator=>{const b=await locator.boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2};};
+
+test('a loose cable follows the pointer and highlights only compatible inputs',async({page})=>{
+ await page.goto('/');const output=jack(page,'v2sine','output'),input=jack(page,'filter1','input');
+ await output.click();await expect(page.locator('.pending-cable')).toBeVisible();
+ const start=await page.locator('.pending-cable').getAttribute('d');
+ await page.mouse.move(1000,400);
+ await expect(page.locator('.pending-cable')).not.toHaveAttribute('d',start);
+ const count=await page.locator('.jack.input').count();await expect(page.locator('.jack.input.patch-target')).toHaveCount(count);await expect(page.locator('.jack.output.patch-target')).toHaveCount(0);
+ await input.hover();await expect(input).toHaveClass(/patch-hover/);
+ await page.screenshot({path:'test-results/patch-preview.png'});
+ await input.click();await expect(page.locator('.pending-cable')).toHaveCount(0);await expect(page.locator('.patch-target')).toHaveCount(0);
+ expect(await page.evaluate(()=>studio.engine.routes.filter1)).toBe('v2sine');
+});
+
+test('dragging works in either direction and replaces only the chosen input',async({page})=>{
+ await page.goto('/');
+ const drag=async(from,to)=>{const a=await midpoint(from),b=await midpoint(to);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:12});await page.mouse.up();};
+ await drag(jack(page,'v1saw','output'),jack(page,'filter1','input'));
+ expect(await page.evaluate(()=>studio.engine.routes.filter1)).toBe('v1saw');
+ await drag(jack(page,'v2sine','output'),jack(page,'filter1','input'));
+ expect(await page.evaluate(()=>studio.engine.routes.filter1)).toBe('v2sine');
+ await drag(jack(page,'filter2','input'),jack(page,'v1pulse','output'));
+ expect(await page.evaluate(()=>studio.engine.routes)).toEqual({filter1:'v2sine',filter2:'v1pulse'});
+ await expect(page.locator('#cables .cable')).toHaveCount(2);
+});
+
+test('cancelling or dropping on an output preserves existing routing and held notes',async({page})=>{
+ await page.goto('/');await page.locator('#power').click();await page.keyboard.down('a');
+ await jack(page,'v1saw','output').click();await page.keyboard.press('Escape');
+ await expect(page.locator('.pending-cable')).toHaveCount(0);expect(await page.evaluate(()=>studio.engine.notes.size)).toBe(1);await page.keyboard.up('a');
+ const a=await midpoint(jack(page,'v1saw','output')),b=await midpoint(jack(page,'v2sine','output'));
+ await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:8});await page.mouse.up();
+ expect(await page.evaluate(()=>studio.engine.routes)).toEqual({});await expect(page.locator('.patch-target')).toHaveCount(0);
+ await jack(page,'filter1','input').focus();await page.keyboard.press('Enter');await expect(page.locator('.jack.output.patch-target')).not.toHaveCount(0);
+ await jack(page,'v2sine','output').focus();await page.keyboard.press('Space');
+ expect(await page.evaluate(()=>studio.engine.routes.filter1)).toBe('v2sine');
+ // A cancelled drag from an occupied input must keep its existing cable.
+ const c=await midpoint(jack(page,'filter1','input'));await page.mouse.move(c.x,c.y);await page.mouse.down();await page.mouse.move(c.x-40,c.y-40,{steps:5});await page.keyboard.press('Escape');await page.mouse.up();
+ expect(await page.evaluate(()=>studio.engine.routes.filter1)).toBe('v2sine');
+ await jack(page,'v2sine','output').click();await page.locator('#preset').selectOption('Bass · plucked saw');await expect(page.locator('.pending-cable')).toHaveCount(0);
+});
+
+test('touch dragging patches without scrolling the page',async({browser})=>{
+ const context=await browser.newContext({hasTouch:true,isMobile:true,viewport:{width:390,height:900}});const page=await context.newPage();await page.goto('http://127.0.0.1:8787');
+ const output=jack(page,'v1saw','output'),input=jack(page,'v1fm','input');await input.scrollIntoViewIfNeeded();
+ const a=await midpoint(output),b=await midpoint(input),scroll=await page.evaluate(()=>scrollY),cdp=await context.newCDPSession(page);
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});
+ for(let i=1;i<=8;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/8,y:a.y+(b.y-a.y)*i/8}]});
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+ expect(await page.evaluate(()=>studio.engine.routes.v1fm)).toBe('v1saw');expect(await page.evaluate(()=>scrollY)).toBe(scroll);await context.close();
+});
+
+test('expanded patch memory loads parameters, routes and descriptions',async({page})=>{
+ await page.goto('/');await expect(page.locator('#preset option')).toHaveCount(21);await expect(page.locator('.empty-tape')).toContainText('No recordings yet.');
+ await page.locator('#preset').selectOption('Lead · pulse width');await expect(page.locator('#preset-note')).toContainText('pulse width');
+ expect(await page.evaluate(()=>({route:studio.engine.routes.v2pwm,depth:studio.engine.params.v2pwm}))).toEqual({route:'lfo',depth:.65});
+ await page.locator('#preset').selectOption('Lead · duophonic');await expect(page.locator('#duo')).toBeChecked();
+ expect(await page.evaluate(()=>studio.engine.routes.v2pitch)).toBe('keyboardUpper');
+});
