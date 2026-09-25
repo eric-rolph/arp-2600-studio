@@ -1,3 +1,4 @@
+import {setupHardware} from './hardware-ui.js';
 import {setupCalibration} from './calibration-ui.js';
 import {setupParts} from './parts-ui.js';
 import {setupTransport} from './transport-ui.js';
@@ -106,10 +107,10 @@ $('#mic').onclick=$('#mic-enable').onclick=safe(async()=>{
  if(micBusy)return;
  if(engine.micStream){engine.stopMicrophone();syncMicrophone();status('Microphone disconnected. Its patch cables are kept.');return;}
  micBusy=true;syncMicrophone();
- try{await power();await engine.microphone($('#mic-device').value);await devices();status('Microphone live. Patch MIC OUT to any input. Use headphones.');}
+ try{await power();const connected=await engine.microphone($('#mic-device').value);await devices();if(connected)status('Microphone live. Patch MIC OUT to any input. Use headphones.');}
  finally{micBusy=false;syncMicrophone();}
 });
-$('#mic-device').onchange=safe(async()=>{if(engine.micStream){try{await engine.microphone($('#mic-device').value);status('Microphone input changed.');}finally{syncMicrophone();}}});
+$('#mic-device').onchange=safe(async()=>{if(engine.micStream||engine.micPending){try{if(await engine.microphone($('#mic-device').value))status('Microphone input changed.');}finally{syncMicrophone();}}});
 engine.addEventListener('micended',()=>{syncMicrophone();status('Microphone disconnected. Its patch cables are kept.');});
 $('#midi').onclick=safe(async()=>{await power();const n=await engine.midi();$('#midi').classList.add('active');$('#midi').textContent='● MIDI';status(n?`${n} MIDI input${n>1?'s':''} connected.`:'MIDI enabled. Connect a keyboard to begin.');});
 engine.addEventListener('midistate',e=>{$('#midi-status').textContent=e.detail.length?e.detail.join(' · '):'MIDI ENABLED · NO DEVICE';});
@@ -136,8 +137,8 @@ window.addEventListener('blur',()=>{pendingKeys.clear();pointers.clear();engine.
 window.addEventListener('beforeunload',e=>{if(tape.takes.length||tape.recording){e.preventDefault();e.returnValue='';}});
 
 function time(t){return `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}.${Math.floor(t%1*100).toString().padStart(2,'0')}`;}
-$('#record').onclick=safe(async()=>{if(tape.recording){tape.stopRecord();return;}await power();await tape.record();status('Recording synth and dry microphone. Stop to keep this take.');});
-$('#tape-stop').onclick=()=>{tape.stopRecord();tape.stop();};$('#tape-play').onclick=safe(async()=>{await power();await tape.play();status('Tape playback started. Play or record another pass over it.');});
+$('#record').onclick=safe(async()=>{if(tape.recording){tape.stopRecord();return;}const request=tape.recordRequest;await power();if(request!==tape.recordRequest)return;if(await tape.record())status('Recording synth and dry microphone. Stop to keep this take.');});
+$('#tape-stop').onclick=()=>{tape.stopRecord();tape.stop();};$('#tape-play').onclick=safe(async()=>{const request=tape.playRequest;await power();if(request!==tape.playRequest)return;if(await tape.play()!==false)status('Tape playback started. Play or record another pass over it.');});
 function tapeChange(){tape.updatePlayback();}
 function setSpeed(speed){tape.speed=speed;$('#tape-speed').value=Math.log2(speed);$('#speed-readout').textContent=`${speed.toFixed(2)}× · ${(12*Math.log2(speed)>=0?'+':'')+(12*Math.log2(speed)).toFixed(1)} st`;$$('[data-speed]').forEach(b=>b.classList.toggle('active',Math.abs(+b.dataset.speed-speed)<.001));tapeChange();}
 $('#tape-speed').oninput=e=>{setSpeed(2**Number(e.target.value));};$$('[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
@@ -185,5 +186,8 @@ setupTransport({engine,tape,performanceUI,power,safe,status});
 
 setupCalibration({engine,tape,status,ids:['arp','tape']});
 
-const studioNavigation=document.querySelector('.rack-nav');if(studioNavigation){for(const [id,label]of [['studio-transport','Transport'],['instrument-parts','Parts'],['clip-editor','Clip editor']]){const a=document.createElement('a');a.href='#'+id;a.textContent=label;studioNavigation.querySelector('a[href="#performance-memory"]').before(a);}}
+const studioNavigation=document.querySelector('.rack-nav');if(studioNavigation){for(const [id,label]of [['hardware-panel','Devices'],['studio-transport','Transport'],['instrument-parts','Parts'],['clip-editor','Clip editor']]){const a=document.createElement('a');a.href='#'+id;a.textContent=label;studioNavigation.querySelector('a[href="#performance-memory"]').before(a);}}
+setupHardware({app:'arp-2600-studio',engine,power,safe,status});
 setupInterface();
+
+engine.addEventListener('micstate',syncMicrophone);

@@ -1,3 +1,4 @@
+import {bindMidiInputs,setMidiSelection} from './midi-input.js';
 import {defaults} from './model.js';
 import {freshPatch,validatePatch,controls} from './patch-state.js';
 export class Engine extends EventTarget {
@@ -13,7 +14,7 @@ export class Engine extends EventTarget {
     if(this.ctx){await this.ctx.resume();return;}
     if(!window.AudioContext)throw new Error('This browser does not support Web Audio. Try current Chrome or Edge.');
     const ctx=this.ctx=new AudioContext({latencyHint:'interactive',sampleRate:48000});
-    try{await ctx.audioWorklet.addModule('/dsp.js');}catch(e){await ctx.close();this.ctx=null;throw e;}
+    try{await this.prepareOutput?.(ctx);await ctx.audioWorklet.addModule('/dsp.js');}catch(e){await ctx.close();this.ctx=null;throw e;}
     this.synth=new AudioWorkletNode(ctx,'synth-2600',{numberOfInputs:1,numberOfOutputs:3,outputChannelCount:[2,1,1]});
     this.bus=ctx.createGain();this.master=ctx.createGain();this.master.gain.value=this.params.master;
     this.limiter=ctx.createDynamicsCompressor();this.limiter.threshold.value=-3;this.limiter.knee.value=0;this.limiter.ratio.value=20;this.limiter.attack.value=.002;this.limiter.release.value=.12;
@@ -38,32 +39,24 @@ export class Engine extends EventTarget {
  sustainPedal(on,owner='manual'){this.pedals??=new Set();if(on)this.pedals.add(owner);else this.pedals.delete(owner);this.sustain=this.pedals.size>0;for(const id of this.released)if(!this.isSustained(id))this.off(id);}
   panic(){this.notes.clear();this.released.clear();this.sustain=false;this.pedals?.clear();this.send('panic',{values:this.params,routes:this.routes});this.dispatchEvent(new Event('panic'));}
   async microphone(deviceId){
-    await this.start();this.stopMicrophone();
-    if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone input requires HTTPS and a supported browser.');
-    this.micStream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined,echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1},video:false});
-    this.micSource=this.ctx.createMediaStreamSource(this.micStream);this.micSource.connect(this.synth);
-    this.micStream.getAudioTracks()[0].onended=()=>{this.stopMicrophone();this.dispatchEvent(new Event('micended'));};
+    this.stopMicrophone();const request=this.micRequest;this.micPending=true;let stream,source;
+    try{
+      await this.start();if(request!==this.micRequest)return false;
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone access needs HTTPS and browser permission.');
+      stream=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined,echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1},video:false});
+      if(request!==this.micRequest){stream.getTracks().forEach(track=>track.stop());return false;}
+      source=this.ctx.createMediaStreamSource(stream);source.connect(this.synth);this.micStream=stream;this.micSource=source;
+      for(const track of stream.getAudioTracks())track.onended=()=>{if(this.micStream!==stream)return;this.stopMicrophone();this.dispatchEvent(new Event('micended'));};
+      return true;
+    }catch(error){source?.disconnect();stream?.getTracks().forEach(track=>track.stop());if(request!==this.micRequest)return false;throw error;}
+    finally{if(request===this.micRequest){this.micPending=false;this.dispatchEvent(new Event('micstate'));}}
   }
-  stopMicrophone(){this.micSource?.disconnect();this.micStream?.getTracks().forEach(t=>t.stop());this.micStream=null;this.micSource=null;}
+  stopMicrophone(){this.micRequest=(this.micRequest||0)+1;this.micPending=false;this.micSource?.disconnect();this.micStream?.getTracks().forEach(t=>{t.onended=null;t.stop();});this.micStream=null;this.micSource=null;this.dispatchEvent(new Event('micstate'));}
   async midi(){
     await this.start();if(!navigator.requestMIDIAccess)throw new Error('Web MIDI is unavailable here. Use Chrome or Edge, or the on-screen keyboard.');
-    this.midiAccess=await navigator.requestMIDIAccess({sysex:false});this.bindMidi();this.midiAccess.onstatechange=()=>this.bindMidi();return this.midiAccess.inputs.size;
+    this.midiAccess??=await navigator.requestMIDIAccess({sysex:false});this.bindMidi();this.midiAccess.onstatechange=()=>this.bindMidi();return this.midiAccess.inputs.size;
   }
   dropNotes(predicate){let changed=false;for(const id of this.notes.keys())if(predicate(id)){this.notes.delete(id);this.released.delete(id);this.dispatchEvent(new CustomEvent('noteaction',{detail:{on:false,id}}));changed=true;}if(changed){this.trigger(false);this.dispatchEvent(new Event('notes'));}}
- bindMidi(){
-    const inputs=[...this.midiAccess.inputs.values()].filter(input=>input.state!=='disconnected');
-    for(const input of this.boundMidi||[])if(!inputs.some(next=>next.id===input.id)){input.onmidimessage=null;this.dropNotes(id=>String(id).startsWith('midi-'+input.id+'-'));for(const owner of this.pedals||[])if(owner.startsWith('midi-'+input.id+'-'))this.sustainPedal(false,owner);}
-    this.boundMidi=inputs;
-    for(const input of inputs)input.onmidimessage=({data,timeStamp})=>{if(data[0]>=240){this.dispatchEvent(new CustomEvent('midirealtime',{detail:{device:input.id,data:Array.from(data),time:timeStamp??performance.now()}}));return;}
-      const [status,n,v]=data,type=status&0xf0,id=`midi-${input.id}-${status&15}-${n}`;
-      if(type===0x90&&v>0)this.routeMidiOn?this.routeMidiOn(n,v/127,id,status&15):this.on(n,v/127,id,false);
-      if(type===0x80||(type===0x90&&v===0))(this.routeMidiOff?this.routeMidiOff(id):this.off(id));
-      if(type===0xe0)this.set('bend',(((v<<7)|n)-8192)/8192*2);
-      if(type===0xb0){const useDefault=this.dispatchEvent(new CustomEvent('midicc',{cancelable:true,detail:{device:input.id,name:input.name,channel:status&15,cc:n,value:v}}));if(n===1&&useDefault)this.set('mod',v/127);if(n===64)this.sustainPedal(v>=64,`midi-${input.id}-${status&15}`);if(n===120||n===123)this.panic();
-        const map={7:['master',1],74:['cutoff',1],71:['resonance',.97],73:['attack',3],72:['release',4]};
-        if(map[n]&&useDefault){const [key,max]=map[n];this.set(key,key==='cutoff'?20*1000**(v/127):v/127*max);this.dispatchEvent(new CustomEvent('control',{detail:{key,value:this.params[key]}}));}}
-      this.dispatchEvent(new Event('notes'));
-    };
-    this.dispatchEvent(new CustomEvent('midistate',{detail:inputs.map(i=>i.name)}));
-  }
+ bindMidi(){bindMidiInputs(this);}
+ setMidiFilter(selection){setMidiSelection(this,selection);}
 }

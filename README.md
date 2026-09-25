@@ -1,4 +1,8 @@
 # 2600 Studio
+## Device setup and calibration
+
+Both studios now include saved keyboard/channel, microphone and output choices; live MIDI activity; and a downloadable device check. Calibration can fit oscillator tuning and tracking from multiple documented pitches. Recovery supports retry after a storage failure, and pending microphone/tape starts can be canceled safely. See the [workflow and validation guide](docs/studio-completion.md).
+
 ## Session and performance update
 
 Automatic local recovery now includes unfinished recordings. Shared transport, MIDI clock, cabinet clip banks/chains, overdub, draggable notes and automation, tape trims/fades, MIDI files and 24-bit/32-bit float WAV are available. The standalone 2600 also has performance capture, MIDI learn and patch undo/redo. TONTO adds frequency shifting, phasing and quad routing. See the [workflow, limits and validation guide](docs/studio-completion.md), including the remaining hardware-calibration work.

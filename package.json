@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy",
-    "check": "node scripts/check.mjs && node --test tests/dsp.test.js tests/audit.test.js tests/session.test.js tests/library-bank.test.js tests/library.test.js tests/upgrade-audio.test.js tests/upgrade-music.test.js",
+    "check": "node scripts/check.mjs && node --test tests/dsp.test.js tests/audit.test.js tests/session.test.js tests/library-bank.test.js tests/library.test.js tests/upgrade-audio.test.js tests/upgrade-music.test.js tests/completion.test.js",
     "test:browser": "playwright test",
     "test:stress": "playwright test --config playwright.stress.config.js"
   },
