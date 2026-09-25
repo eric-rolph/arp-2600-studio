@@ -13,7 +13,7 @@ test('instrument, patching, voice, tape capture and WAV export work end to end',
  await page.locator('#record').click();await page.keyboard.down('g');await page.waitForTimeout(1200);await page.keyboard.up('g');await page.locator('#tape-stop').click();await expect(page.locator('.take')).toHaveCount(1);
  const capture=await page.evaluate(()=>{const t=studio.tape.takes[0];return {seconds:t.wet.duration,channels:t.wet.numberOfChannels,dry:t.dry.numberOfChannels,wetPeak:Math.max(...t.wet.getChannelData(0).slice(1000,10000).map(Math.abs))};});expect(capture.seconds).toBeGreaterThan(.8);expect(capture.channels).toBe(2);expect(capture.dry).toBe(1);
  await page.locator('[data-speed="2"]').click();await expect(page.locator('#speed-readout')).toContainText('+12.0 st');
- await page.locator('#tape-play').click();await expect(page.locator('#tape-status')).toHaveText('PLAYING');await page.locator('#tape-stop').click();
+ await page.locator('#loop').check();await page.locator('#tape-play').click();await expect(page.locator('#tape-status')).toHaveText('PLAYING');await page.locator('#tape-stop').click();await page.locator('#loop').uncheck();
  const downloadPromise=page.waitForEvent('download');await page.locator('#export-mix').click();const download=await downloadPromise;expect(download.suggestedFilename()).toBe('2600-tape-mix.wav');
  await page.locator('#panic').click();await page.locator('#mic').click();expect(await page.evaluate(()=>studio.engine.micStream)).toBeNull();
  await page.screenshot({path:'test-results/desktop.png',fullPage:true});expect(errors).toEqual([]);
@@ -64,7 +64,7 @@ test('dragging works in either direction and replaces only the chosen input',asy
 });
 
 test('cancelling or dropping on an output preserves existing routing and held notes',async({page})=>{
- await page.goto('/');await page.locator('#power').click();await page.keyboard.down('a');
+ await page.goto('/');await page.locator('#power').click();await expect(page.locator('#audio-state')).toHaveText('ENGINE RUNNING');await page.keyboard.down('a');await expect.poll(()=>page.evaluate(()=>studio.engine.notes.size)).toBe(1);
  await jack(page,'v1saw','output').click();await page.keyboard.press('Escape');
  await expect(page.locator('.pending-cable')).toHaveCount(0);expect(await page.evaluate(()=>studio.engine.notes.size)).toBe(1);await page.keyboard.up('a');
  const a=await midpoint(jack(page,'v1saw','output')),b=await midpoint(jack(page,'v2sine','output'));

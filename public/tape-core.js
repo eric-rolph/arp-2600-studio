@@ -17,8 +17,8 @@ export class TapePlaybackCore{
 }
 if(typeof AudioWorkletProcessor!=='undefined'){
  class TapePlayer extends AudioWorkletProcessor{
-  constructor(){super();this.core=new TapePlaybackCore(sampleRate);this.clock=new TransportClock(sampleRate);this.port.onmessage=({data:m})=>{if(m.type==='configure'){this.core.configure(m.takes,m.settings);if(m.token)this.port.postMessage({ready:m.token});}if(m.type==='transport'){this.clock.command(m);if(m.action==='start')this.baseTempo=m.tempo;}if(m.type==='start'){this.linked=m.linked;this.core.start(m.frame,m.seconds);this.core.settings.clockRatio=1;}if(m.type==='stop')this.core.stop();};}
-  process(inputs,outputs){const was=this.core.running,a=outputs[0];for(let i=0;i<a[0].length;i++){this.clock.tick(currentFrame+i);if(this.linked)this.core.settings.clockRatio=this.clock.tempo/(this.baseTempo||108);const v=this.core.tick(currentFrame+i);a[0][i]=v[0];a[1][i]=v[1];}if(currentFrame%2048===0||was&&!this.core.running)this.port.postMessage({running:this.core.running,position:this.core.position,cycle:this.core.cycle});return true;}
+  constructor(){super();this.run=0;this.core=new TapePlaybackCore(sampleRate);this.clock=new TransportClock(sampleRate);this.port.onmessage=({data:m})=>{if(m.type==='configure'){this.core.configure(m.takes,m.settings);if(m.token)this.port.postMessage({ready:m.token});}if(m.type==='transport'){this.clock.command(m);if(m.action==='start')this.baseTempo=m.tempo;}if(m.type==='start'){this.run=m.run;this.linked=m.linked;this.core.start(m.frame,m.seconds);this.core.settings.clockRatio=1;}if(m.type==='stop'){this.run=m.run;this.core.stop();}};}
+  process(inputs,outputs){const was=this.core.running,a=outputs[0];for(let i=0;i<a[0].length;i++){this.clock.tick(currentFrame+i);if(this.linked)this.core.settings.clockRatio=this.clock.tempo/(this.baseTempo||108);const v=this.core.tick(currentFrame+i);a[0][i]=v[0];a[1][i]=v[1];}if(currentFrame%2048===0||was&&!this.core.running)this.port.postMessage({run:this.run,running:this.core.running,position:this.core.position,cycle:this.core.cycle});return true;}
  }
  registerProcessor('studio-tape-player',TapePlayer);
 }
