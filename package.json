@@ -11,7 +11,7 @@
     "test:stress": "playwright test --config playwright.stress.config.js"
   },
   "devDependencies": {
-    "wrangler": "4.139.0",
+    "wrangler": "4.166.0",
     "@playwright/test": "1.63.0"
   }
 }
