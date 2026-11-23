@@ -1,4 +1,14 @@
 # 2600 Studio
+
+[![Launch Live Synth](https://img.shields.io/badge/Play%20Live-arp--2600--studio.ericrolph.workers.dev-f59e0b)](https://arp-2600-studio.ericrolph.workers.dev)
+[![Web Audio + MIDI](https://img.shields.io/badge/Web%20Audio-Semi--Modular%20%2B%20MIDI-38bdf8)](https://arp-2600-studio.ericrolph.workers.dev)
+
+<p align="center">
+  <a href="https://arp-2600-studio.ericrolph.workers.dev">
+    <img src="docs/preview.png" alt="2600 Studio semi-modular browser synthesizer" width="780" />
+  </a>
+</p>
+
 ## Device setup and calibration
 
 Both studios now include saved keyboard/channel, microphone and output choices; live MIDI activity; and a downloadable device check. Calibration can fit oscillator tuning and tracking from multiple documented pitches. Recovery supports retry after a storage failure, and pending microphone/tape starts can be canceled safely. See the [workflow and validation guide](docs/studio-completion.md).
